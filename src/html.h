@@ -41,8 +41,12 @@ const char MAIN_PAGE[] = R"=====(
 
 <body>
     <div class="container">
+     
         <div class="row">
             <div class="col-md-12 col-xs-12">
+             <iframe id="iframe1" width="100%" height="300"style="border:none;" src="http://192.168.1.150/" >
+  <p>Your browser does not support iframes.</p>
+</iframe>
                 <h1 class="text-center">CCKIT Main</h1>
             </div>
         </div>
@@ -132,6 +136,20 @@ const char MAIN_PAGE[] = R"=====(
     </footer>
 
     <script>
+   function setIframeSrc() {
+  var s = "http://192.168.1.150/";
+  var iframe1 = document.getElementById('iframe1');
+  iframe1.src = s;
+  setTimeout(function(){
+      if (window.stop) {
+          window.stop();
+      } else {
+          document.execCommand('Stop'); // MSIE
+      }
+  }, 5000);
+}
+setTimeout(setIframeSrc, 5000);
+
 function updateSliders()
 {
      var redVal = document.getElementById('r').value;
@@ -213,3 +231,180 @@ const char PAGE_404[] = R"====(
     </body>
 </html>
 )====";
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const char SETTINGS_PAGE[] = R"=====(
+<!doctype html>
+<html lang="en">
+<head>  
+<meta name="viewport" content="width=device-width, initial-scale=1">  
+<title> Login Page </title>  
+<style>   
+Body {  
+  font-family: Calibri, Helvetica, sans-serif;  
+  background-color: #099bdd;  
+}  
+.vertical-center {
+  margin: 0;
+  position: absolute;
+  top: 50%;
+  -ms-transform: translateY(-50%);
+  transform: translateY(-50%);
+}
+button {   
+       background-color: #185abc;   
+       width: 50%;  
+        color: white;   
+        padding: 15px;   
+          margin-top: 20px;
+    margin-bottom: 20px;
+    margin-right:auto;
+    margin-left:auto;
+        border: 1px solid black;   
+        cursor: pointer;  
+        border-radius: 6px; 
+         }   
+ form {   
+        //border: 3px solid #f1f1f1;   
+
+    }   
+ input[type=text], input[type=password] {   
+        width: 100%;   
+        margin: 8px 0;  
+        padding: 12px 20px;   
+        display: inline-block;   
+        border: 2px solid black;   
+        box-sizing: border-box;   
+    }  
+ button:hover {   
+        opacity: 0.7;   
+    }   
+  .cancelbtn {   
+        width: auto;   
+        padding: 10px 18px;  
+        margin: 10px 5px;  
+    }   
+        
+     
+ .container {  
+     margin: auto;
+      width: 80%; 
+        padding: 25px;   
+        background-color: white;
+         border-radius: 15px; 
+         text-align: center;
+    }   
+    .mydiv {
+    margin-right:auto;
+    margin-left:auto;
+     display: flex;
+  flex-direction: row;
+  justify-content: center;
+}
+</style>   
+</head>    
+<body>    
+   
+    <form>  
+        <div class="container">   
+         <center> <h1> CCKIT Wifi Settings </h1> </center>   
+         <hr >
+         <div class="mydiv">
+          <b clabel id="camStatus"></b>
+          </div>
+           <hr  >
+            <label>SSID</label>   
+            <input type="text" placeholder="Enter SSID" id="ssidText" required>  
+            <label>Password</label>   
+            <input type="password" placeholder="Enter Password" id="passwordText" required>  
+     <button type="submit"  onclick="sendRGB()">Process</button>   
+           <div class="mydiv">
+          <h3 clabel id="msg"></h3>
+          </div>
+        </div>   
+    </form>     
+</body>     
+
+    <script>
+
+        function sendRGB() {
+            //get rgb values from sliders
+            var passVal = document.getElementById('passwordText').value;
+            var ssidVal = document.getElementById('ssidText').value;
+
+            // wait for answer callback
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (this.readyState == 4 && this.status == 200) {
+                    
+                }
+            };
+
+            // create querrystring
+            var sendStr = "setWifi?s=" + ssidVal + "&p=" + passVal;
+            // console.log(sendStr);
+
+            // send querrystring using xmlhttprequest
+            xhttp.open("GET", sendStr, true);
+            xhttp.send();
+        }
+
+           setInterval(function () {
+            // Call a function repetatively with 2 Second interval
+            notifyCam();
+            getMessage();
+        }, 1000); //2000mSeconds update rate
+
+        function notifyCam() {
+            
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (this.readyState == 4 && this.status == 200) {
+                    document.getElementById("camStatus").innerHTML =
+                        this.responseText;
+                    console.log(this.responseText);
+                }
+            };
+            xhttp.open("GET", "notifyCAM", true);
+            xhttp.send();
+        }
+         function getMessage() {
+            
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (this.readyState == 4 && this.status == 200) {
+                    document.getElementById("msg").innerHTML =
+                        this.responseText;
+                    console.log(this.responseText);
+                }
+            };
+            xhttp.open("GET", "message", true);
+            xhttp.send();
+        }
+    </script>
+
+    <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js"
+        integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n"
+        crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+        integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa"
+        crossorigin="anonymous"></script>
+</body>
+
+</html>
+)=====";
+
+
+
