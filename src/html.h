@@ -87,27 +87,14 @@ const char MAIN_PAGE[] = R"=====(
                     </div>
                 </div>
 
-                   <div class="row">
-                    <div class="col-md-4 col-xs-4 my-div text-center">
-                        <span id="txt">SSID</span>
-                    </div>
-                    <div class="col-md-8 col-xs-8 my-div">
-                        <input id="s" type="text" id="textVal"">
-                    </div>
                     
                     <button onclick="sendRGB()" type="button" class="btn btn-primary">Process</button>
 
+                    <button onclick="wifiConfigMode()" type="button" class="btn btn-primary">Start Wifi Config</button>
+
                 </div>
 
-                <div class="row">
-                    <div class="col-md-4 col-xs-4 my-div text-center">
-                        <span id="checkboxtext">STA</span>
-                    </div>
-                    <div class="col-md-8 col-xs-8 my-div">
-                        <input type="checkbox" id="checkbx">
-                    </div>
-                </div>
-            </div>
+               
              <div class="col-md-4 col-xs-12">
                 <div class="col-md-12 col-xs-12">
                     <h2 class="text-center">Monitor</h2>
@@ -161,16 +148,16 @@ function updateSliders()
             //get rgb values from sliders
             var redVal = document.getElementById('r').value;
             var greenVal = document.getElementById('g').value;
-            var ssidVal = document.getElementById('s').value;
-            var checkboxVal = document.getElementById('checkbx').checked;
+            //var ssidVal = document.getElementById('s').value;
+           // var checkboxVal = document.getElementById('checkbx').checked;
 
             // convert rgb values range from 0 - 100 to 0 - 255
             var r = parseInt(redVal ).toString();
             var g = parseInt(greenVal ).toString();
 
             // show slider value in labels
-            document.getElementById('rVal').innerHTML = String(redVal);
-            document.getElementById('gVal').innerHTML = String(greenVal);
+            document.getElementById('rVal').innerHTML = String(redVal)+"C";
+            document.getElementById('gVal').innerHTML = String(greenVal)+"%";
            // document.getElementById('txt').innerHTML = String(ssidVal);
 
             // wait for answer callback
@@ -182,7 +169,7 @@ function updateSliders()
             };
 
             // create querrystring
-            var sendStr = "setRGB?r=" + r + "&g=" + g +"&s=" + String(ssidVal)+"&cb=" + String(checkboxVal);
+            var sendStr = "setRGB?r=" + r + "&g=" + g ;
             // console.log(sendStr);
 
             // send querrystring using xmlhttprequest
@@ -206,6 +193,24 @@ function updateSliders()
                 }
             };
             xhttp.open("GET", "readADC", true);
+            xhttp.send();
+        }
+          function wifiConfigMode() {
+
+            // wait for answer callback
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (this.readyState == 4 && this.status == 200) {
+                    
+                }
+            };
+
+            // create querrystring
+            var sendStr = "setWifiMode?w=1";
+            // console.log(sendStr);
+
+            // send querrystring using xmlhttprequest
+            xhttp.open("GET", sendStr, true);
             xhttp.send();
         }
     </script>
@@ -331,7 +336,7 @@ button {
             <input type="password" placeholder="Enter Password" id="passwordText" required>  
      <button type="submit"  onclick="sendRGB()">Process</button>   
            <div class="mydiv">
-          <h3 clabel id="msg"></h3>
+          <h4 clabel id="msg"></h4>
           </div>
         </div>   
     </form>     

@@ -16,7 +16,10 @@ const char *PARAM_FLOAT = "inputFloat";
 
 String esid;
 String epass = "";
-
+IPAddress staticIP(192, 168, 1, 151);
+IPAddress gateway(192, 168, 1, 254);
+IPAddress subnet(255, 255, 255, 0);
+IPAddress dns(192, 168, 1, 254);
 #define cmdTemp 0x01
 #define cmdHum 0x02
 #define cmdCamStatus 0x03
@@ -31,8 +34,8 @@ float hum;
 byte camStatus;
 uint8_t broadcastAddress[] = {0xE0, 0xE2, 0xE6, 0xCF, 0x9D, 0xAC};
 byte peerConnected = 0;
-byte camWifiSettingResponse=0;
-uint8_t mode=0;
+byte camWifiSettingResponse = 0;
+uint8_t mode = 0;
 uint8_t loadWifiMode();
 void writeWifiMode(uint8_t mode);
 void processData(std::string value);
@@ -47,7 +50,7 @@ void configCamWifi(const char *ssid, const char *pass);
 void startPage();
 void saveToEEPROM(String qsid, String qpass);
 void loadFromEEPROM();
-void getWifiConfFromHTTP(void* parameter);
+void getWifiConfFromHTTP(void *parameter);
 String inputParam;
 String inputMessage;
 String ssidRecv;
@@ -103,7 +106,6 @@ void handleWifiSettings(AsyncWebServerRequest *request)
   ssidRecv = request->arg("s");
   passRecv = request->arg("p");
 
- 
   // show values on serial monitor
   Serial.print(ssidRecv);
   Serial.print("\t");
@@ -111,8 +113,7 @@ void handleWifiSettings(AsyncWebServerRequest *request)
 
   // send answer to client
   request->send(200, "text/plane", "1");
-xTaskCreate( getWifiConfFromHTTP, "getWifiConfFromHTTP", 4096, ( void * ) 1, 1, NULL );
-
+  xTaskCreate(getWifiConfFromHTTP, "getWifiConfFromHTTP", 4096, (void *)1, 1, NULL);
 }
 void handleADC(AsyncWebServerRequest *request)
 {
@@ -151,6 +152,19 @@ void handleNotFound(AsyncWebServerRequest *request)
 {
   request->send(404, "text/html", PAGE_404);
 }
+void handleWifiMode(AsyncWebServerRequest *request)
+{
+
+  String req = request->arg("w");
+
+  Serial.println(req);
+
+  // send answer to client
+  request->send(200, "text/plane", "1");
+  writeWifiMode(0);
+  vTaskDelay(2000 / portTICK_PERIOD_MS);
+  ESP.restart();
+}
 
 IPAddress IP;
 void setup()
@@ -162,18 +176,22 @@ void setup()
     Serial.println("failed to init EEPROM");
   }
   Serial.println("CCKIT Main");
-  //writeWifiMode(1);
-  mode=loadWifiMode();
-  saveToEEPROM("Aykut", "edirne12345");
+  // writeWifiMode(0);
+  mode = loadWifiMode();
+  // saveToEEPROM("Aykut", "edirne12345");
   loadFromEEPROM();
   if (mode == 1)
   {
     WiFi.mode(WIFI_STA);
+    WiFi.config(staticIP, gateway, subnet, dns, dns);
     WiFi.begin(esid.c_str(), epass.c_str());
     if (WiFi.waitForConnectResult() != WL_CONNECTED)
     {
       Serial.println("WiFi Failed!");
       Serial.println();
+      writeWifiMode(0);
+      vTaskDelay(2000 / portTICK_PERIOD_MS);
+      ESP.restart();
     }
     Serial.print("IP Address: ");
     Serial.println(WiFi.localIP());
@@ -181,8 +199,11 @@ void setup()
   else
   {
     WiFi.mode(WIFI_AP);
-    WiFi.softAP(ssidAP, passwordAP);
+     WiFi.softAP(ssidAP, passwordAP);
+    WiFi.softAPConfig(staticIP, gateway, subnet);
+   
     IP = WiFi.softAPIP();
+    Serial.println(IP);
   }
 
   esp_now_deinit();
@@ -230,8 +251,8 @@ void processData(std::string value)
   case cmdCamStatus:
     camStatus = value[1];
     break;
-    case cmdResponseSetting:
-    camWifiSettingResponse=value[1];
+  case cmdResponseSetting:
+    camWifiSettingResponse = value[1];
     break;
   default:
     break;
@@ -255,7 +276,7 @@ void sendDebugMessages(int tick)
   static unsigned long previousMillis = 0;
   if (currentMillis - previousMillis >= tick)
   {
-    Serial.printf("Temp:%.2f\t Humudity:%.2f\t PeerStatus:%d WifiMode:%d\t \n", temp, hum, peerConnected,mode);
+    Serial.printf("Temp:%.2f\t Humudity:%.2f\t PeerStatus:%d WifiMode:%d\t \n", temp, hum, peerConnected, mode);
     previousMillis = currentMillis;
   }
 }
@@ -292,12 +313,13 @@ void configCamWifi(const char *ssid, const char *pass)
 }
 void startPage()
 {
-  if (mode == 0)
+  if (mode == 1)
   {
     server.on("/", HTTP_GET, handleRoot);
     server.on("/readADC", HTTP_GET, handleADC);
     server.on("/setLED", HTTP_GET, handleLED);
     server.on("/setRGB", HTTP_GET, handleRGB);
+    server.on("/setWifiMode", HTTP_GET, handleWifiMode);
     server.onNotFound(handleNotFound);
   }
   else
@@ -418,40 +440,46 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
     Serial.println("peer disconnected");
   }
 }
-void getWifiConfFromHTTP(void* parameter)
+void getWifiConfFromHTTP(void *parameter)
 {
-  message="Processing config...";
-    broadcast_message data;
+  message = "Processing config...";
+  broadcast_message data;
   ((String) "wificonfig").toCharArray(data.type, 16);
   (ssidRecv).toCharArray(data.ssid, 16);
   (passRecv).toCharArray(data.pass, 16);
   esp_err_t result = esp_now_send(0, (uint8_t *)&data, sizeof(data));
-  long startTime=millis();
+  long startTime = millis();
   long totalTime;
-  while (!camWifiSettingResponse&&totalTime<6000)
+  while (!camWifiSettingResponse && totalTime < 6000)
   {
-    totalTime=millis()-startTime;
-    vTaskDelay(100/portTICK_PERIOD_MS);
+    totalTime = millis() - startTime;
+    vTaskDelay(100 / portTICK_PERIOD_MS);
   }
   if (!camWifiSettingResponse)
   {
-    message="Timeout: no response from cam module";
+    message = "Timeout: no response from cam module";
+    vTaskDelay(3000 / portTICK_PERIOD_MS);
     Serial.println("Timeout: no response from cam module");
+    message = "Done. Restarting...";
+    saveToEEPROM(ssidRecv, passRecv);
+    writeWifiMode(1); // set sta mode
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
+    ESP.restart();
   }
   else
   {
-      message="Done. Restarting...";
-     saveToEEPROM(ssidRecv, passRecv);
-     writeWifiMode(1);//set sta mode
-     vTaskDelay(5000/portTICK_PERIOD_MS);
-      ESP.restart();
+    message = "Done. Restarting...";
+    saveToEEPROM(ssidRecv, passRecv);
+    writeWifiMode(1); // set sta mode
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
+    ESP.restart();
   }
   vTaskDelete(NULL);
 }
 
 void writeWifiMode(uint8_t mode)
 {
-  EEPROM.write(511, mode);//EEPROM.put(address, boardId);
+  EEPROM.write(511, mode); // EEPROM.put(address, boardId);
   EEPROM.commit();
 }
 uint8_t loadWifiMode()
