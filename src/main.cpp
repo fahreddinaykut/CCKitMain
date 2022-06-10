@@ -32,6 +32,7 @@ union twoByte
 float temp;
 float hum;
 byte camStatus;
+byte processStatus=0;
 uint8_t broadcastAddress[] = {0xE0, 0xE2, 0xE6, 0xCF, 0x9D, 0xAC};
 byte peerConnected = 0;
 byte camWifiSettingResponse = 0;
@@ -118,6 +119,19 @@ void handleWifiSettings(AsyncWebServerRequest *request)
 void handleADC(AsyncWebServerRequest *request)
 {
   request->send(200, "text/plane", String(temp));
+}
+void handlePrcStatus(AsyncWebServerRequest *request)
+{
+  String processBtn;
+  if (processStatus)
+  {
+    processBtn="Stop";
+  }
+  else
+  {
+    processBtn="Process"
+  }
+  request->send(200, "text/plane", processBtn);
 }
 void handleNotifyCam(AsyncWebServerRequest *request)
 {
@@ -317,6 +331,7 @@ void startPage()
   {
     server.on("/", HTTP_GET, handleRoot);
     server.on("/readADC", HTTP_GET, handleADC);
+    server.on("/readPrcButton", HTTP_GET, handlePrcStatus);
     server.on("/setLED", HTTP_GET, handleLED);
     server.on("/setRGB", HTTP_GET, handleRGB);
     server.on("/setWifiMode", HTTP_GET, handleWifiMode);

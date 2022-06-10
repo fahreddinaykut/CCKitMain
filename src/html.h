@@ -88,8 +88,7 @@ const char MAIN_PAGE[] = R"=====(
                 </div>
 
                     
-                    <button onclick="sendRGB()" type="button" class="btn btn-primary">Process</button>
-
+                    <button id="prcButton" onclick="sendRGB()" type="button" class="btn btn-primary">Process</button>
                     <button onclick="wifiConfigMode()" type="button" class="btn btn-primary">Start Wifi Config</button>
 
                 </div>
@@ -194,6 +193,17 @@ function updateSliders()
             };
             xhttp.open("GET", "readADC", true);
             xhttp.send();
+
+             var xhttp2 = new XMLHttpRequest();
+            xhttp2.onreadystatechange = function () {
+                if (this.readyState == 4 && this.status == 200) {
+                    document.getElementById("prcButton").innerHTML =
+                        this.responseText;
+                    console.log(this.responseText);
+                }
+            };
+            xhttp2.open("GET", "readPrcButton", true);
+            xhttp2.send();
         }
           function wifiConfigMode() {
 
