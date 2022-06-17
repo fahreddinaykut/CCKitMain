@@ -17,6 +17,11 @@ const char MAIN_PAGE[] = R"=====(
     margin-before: 0.5em;
     margin-after: 0.5em;
 }
+            iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+      }
         .btn {
             width: 100%;
             margin: 5px;
@@ -26,13 +31,22 @@ const char MAIN_PAGE[] = R"=====(
             font-size: 20px;
             padding: 10px;
         }
+table, th, td {
 
+    text-align: center;
+     font-family: Arial, Helvetica, sans-serif;
+     margin-bottom: 15px;
+}
         .my-div {
             margin-bottom: 15px;
 
         }
-        .div-my {
-  align-items: center
+           .mydiv {
+    margin-right:auto;
+    margin-left:auto;
+     display: flex;
+  flex-direction: row;
+  justify-content: center;
 }
     </style>
 
@@ -40,19 +54,38 @@ const char MAIN_PAGE[] = R"=====(
 </head>
 
 <body>
+    
     <div class="container">
      
         <div class="row">
             <div class="col-md-12 col-xs-12">
-             <iframe id="iframe1" width="100%" height="300"style="border:none;" src="http://192.168.1.150/" >
-  <p>Your browser does not support iframes.</p>
-</iframe>
                 <h1 class="text-center">CCKIT Main</h1>
             </div>
         </div>
 
         <hr>
-
+ <div class="mydiv">
+ <table>
+    <tr>
+        <td style="vertical-align:middle;">
+           <b clabel id="camStatus" style="margin-right:30px"></b>
+        </td>
+        <td style="vertical-align:middle;">
+                <button onclick="flashToggle()"  type="button" class="btn btn-primary">Flash Toggle</button>
+        </td>
+    </tr>
+</table>
+         
+      
+          </div>
+          <div>
+          <div style="position:relative;padding-top:56.25%;">
+         <iframe id="iframe1" src="http://192.168.1.150/" frameborder="0" allowfullscreen style="position:absolute;top:0;left:0;width:100%;height:100%;">
+  <p>Your browser does not support iframes.</p>
+</iframe>
+</div>
+</div>
+<hr>
         <div class="row">
 
            
@@ -64,6 +97,8 @@ const char MAIN_PAGE[] = R"=====(
                 <hr>
                 <div class="row">
                   <div class="col-md-8 col-xs-8 div-my">
+
+
                  <p style="text-align:center">Target Temperature</p>
                 </div>
                     <div class="col-md-8 col-xs-8 my-div">
@@ -90,7 +125,7 @@ const char MAIN_PAGE[] = R"=====(
                     
                     <button id="prcButton" onclick="sendRGB()" type="button" class="btn btn-primary">Process</button>
                     <button onclick="wifiConfigMode()" type="button" class="btn btn-primary">Start Wifi Config</button>
-
+                   
                 </div>
 
                
@@ -98,19 +133,32 @@ const char MAIN_PAGE[] = R"=====(
                 <div class="col-md-12 col-xs-12">
                     <h2 class="text-center">Monitor</h2>
                 </div>
-                <hr>
-                <div >
-                <p style="text-align:center;font-size:160%;">Current Temperature</p>
-                </div>
-                <div class="col-md-12 col-sm-12 text-center my-text">
-                    ADC Value: <span id="tempVal">0C</span>
-                </div>
-                <div class="col-md-12 col-sm-8 text-center my-text">
-                <p style="text-align:center;font-size:160%;">Current Humidity</p>
-                </div>
-                <div class="col-md-12 col-sm-12 text-center my-text">
-                    ADC Value: <span id="humVal">0C</span>
-                </div>
+                 <hr>
+
+                                  <table style="width:100%">
+  <tr>
+    <td style='font-weight:bold;'>Current Temperature</td>
+    <td style='font-weight:bold;'>Target Temperature</td>
+  </tr>
+  <tr>
+    <td  id="tempVal">16</td>
+    <td id="tarTempVal">14</td>
+  </tr>
+</table>
+                <table style="width:100%">
+  <tr>
+    <td style='font-weight:bold;'>Current Humidity</td>
+    <td style='font-weight:bold;'>Target Humidity</td>
+  </tr>
+  <tr>
+    <td  id="humVal">16</td>
+    <td id="tarHumVal">14</td>
+  </tr>
+</table> 
+                 <div class="mydiv"> 
+                    <h5 id="msg" ></h5>
+                      </div>
+               
             </div>
         </div>
     </div>
@@ -122,19 +170,6 @@ const char MAIN_PAGE[] = R"=====(
     </footer>
 
     <script>
-   function setIframeSrc() {
-  var s = "http://192.168.1.150/";
-  var iframe1 = document.getElementById('iframe1');
-  iframe1.src = s;
-  setTimeout(function(){
-      if (window.stop) {
-          window.stop();
-      } else {
-          document.execCommand('Stop'); // MSIE
-      }
-  }, 5000);
-}
-setTimeout(setIframeSrc, 5000);
 
 function updateSliders()
 {
@@ -147,8 +182,7 @@ function updateSliders()
             //get rgb values from sliders
             var redVal = document.getElementById('r').value;
             var greenVal = document.getElementById('g').value;
-            //var ssidVal = document.getElementById('s').value;
-           // var checkboxVal = document.getElementById('checkbx').checked;
+
 
             // convert rgb values range from 0 - 100 to 0 - 255
             var r = parseInt(redVal ).toString();
@@ -179,19 +213,40 @@ function updateSliders()
         setInterval(function () {
             // Call a function repetatively with 2 Second interval
             getData();
+            getMessage() ;
+            notifyCam();
         }, 1000); //2000mSeconds update rate
-
+        function notifyCam() {
+            
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (this.readyState == 4 && this.status == 200) {
+                    document.getElementById("camStatus").innerHTML =
+                        this.responseText;
+                    console.log(this.responseText);
+                }
+            };
+            xhttp.open("GET", "notifyCAM", true);
+            xhttp.send();
+        }
         function getData() {
             
             var xhttp = new XMLHttpRequest();
             xhttp.onreadystatechange = function () {
                 if (this.readyState == 4 && this.status == 200) {
+                    const myArray = this.responseText.split("|");
                     document.getElementById("tempVal").innerHTML =
-                        this.responseText;
+                       myArray[0];
+                       document.getElementById("tarTempVal").innerHTML =
+                       myArray[1];
+                       document.getElementById("humVal").innerHTML =
+                       myArray[2];
+                       document.getElementById("tarHumVal").innerHTML =
+                       myArray[3];
                     console.log(this.responseText);
                 }
             };
-            xhttp.open("GET", "readADC", true);
+            xhttp.open("GET", "liveData", true);
             xhttp.send();
 
              var xhttp2 = new XMLHttpRequest();
@@ -205,6 +260,19 @@ function updateSliders()
             xhttp2.open("GET", "readPrcButton", true);
             xhttp2.send();
         }
+          function getMessage() {
+            
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (this.readyState == 4 && this.status == 200) {
+                    document.getElementById("msg").innerHTML =
+                        this.responseText;
+                    console.log(this.responseText);
+                }
+            };
+            xhttp.open("GET", "message", true);
+            xhttp.send();
+        }
           function wifiConfigMode() {
 
             // wait for answer callback
@@ -217,6 +285,24 @@ function updateSliders()
 
             // create querrystring
             var sendStr = "setWifiMode?w=1";
+            // console.log(sendStr);
+
+            // send querrystring using xmlhttprequest
+            xhttp.open("GET", sendStr, true);
+            xhttp.send();
+        }
+         function flashToggle() {
+
+            // wait for answer callback
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (this.readyState == 4 && this.status == 200) {
+                    
+                }
+            };
+
+            // create querrystring
+            var sendStr = "flashToggle?w=1";
             // console.log(sendStr);
 
             // send querrystring using xmlhttprequest

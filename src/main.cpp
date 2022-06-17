@@ -1,198 +1,24 @@
+#include "decs.h"
+#define PIDDEBUG
+// pid settings and gains
+#define OUTPUT_MIN 0
+#define OUTPUT_MAX 255
+#define KP .12
+#define KI .0003
+#define KD 0
 
-#include "Arduino.h"
-#include <esp_now.h>
-#include <WiFi.h>
-#include <AsyncTCP.h>
-#include <ESPAsyncWebServer.h>
-#include "html.h"
-#include "EEPROM.h"
-
-const char *ssidAP = "CCKIT";
-const char *passwordAP = "12345678";
-
-const char *PARAM_STRING = "inputString";
-const char *PARAM_INT = "inputInt";
-const char *PARAM_FLOAT = "inputFloat";
-
-String esid;
-String epass = "";
-IPAddress staticIP(192, 168, 1, 151);
-IPAddress gateway(192, 168, 1, 254);
-IPAddress subnet(255, 255, 255, 0);
-IPAddress dns(192, 168, 1, 254);
-#define cmdTemp 0x01
-#define cmdHum 0x02
-#define cmdCamStatus 0x03
-#define cmdResponseSetting 0x04
-union twoByte
-{
-  byte bVal[2];
-  int iVal;
-};
-float temp;
-float hum;
-byte camStatus;
-byte processStatus=0;
-uint8_t broadcastAddress[] = {0xE0, 0xE2, 0xE6, 0xCF, 0x9D, 0xAC};
-byte peerConnected = 0;
-byte camWifiSettingResponse = 0;
-uint8_t mode = 0;
-uint8_t loadWifiMode();
-void writeWifiMode(uint8_t mode);
-void processData(std::string value);
-#define CHANNEL 3
-void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len);
-void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status);
-void broadcast();
-void sendData(std::string incomingdata, uint8_t len);
-void sendDebugMessages(int tick);
-void initBroadcastSlave();
-void configCamWifi(const char *ssid, const char *pass);
-void startPage();
-void saveToEEPROM(String qsid, String qpass);
-void loadFromEEPROM();
-void getWifiConfFromHTTP(void *parameter);
-String inputParam;
-String inputMessage;
-String ssidRecv;
-String passRecv;
-// Structure example to receive data
-// Must match the sender structure
-esp_now_peer_info_t slave;
-
-typedef struct broadcast_message
-{
-  char type[16] = "unknown"; // data or broadcast
-  char ssid[16] = "slave";   // slave or master
-  char pass[16] = "unknown"; // slider pan tilt
-  uint8_t datalen = 1;
-  char data[128] = " ";
-} broadcast_message;
-// callback function that will be executed when data is received
+AutoPID myPID(&temp, &targetTemp, &tempOutputVal, OUTPUT_MIN, OUTPUT_MAX, KP, KI, KD);
 AsyncWebServer server(80);
 
-void handleLED(AsyncWebServerRequest *request)
-{
-  String t_state = request->arg("LEDstate"); // Refer  xhttp.open("GET", "setLED?LEDstate="+led, true);
-  String t_num = request->arg("ledNum");
-  Serial.print(t_state);
-  Serial.print("\t");
-  Serial.println(t_num);
-
-  request->send(200, "text/plane", "1"); // Send web page
-}
-void handleRGB(AsyncWebServerRequest *request)
-{
-  // get RGB values from parameters
-  String rVal = request->arg("r");
-  String gVal = request->arg("g");
-  String sVal = request->arg("s");
-  String checkbox = request->arg("cb");
-
-  // show values on serial monitor
-  Serial.print(checkbox);
-  Serial.print("\t");
-  Serial.print(sVal);
-  Serial.print("\t");
-  Serial.print(rVal);
-  Serial.print("\t");
-  Serial.println(gVal);
-
-  // send answer to client
-  request->send(200, "text/plane", "1");
-}
-void handleWifiSettings(AsyncWebServerRequest *request)
-{
-
-  ssidRecv = request->arg("s");
-  passRecv = request->arg("p");
-
-  // show values on serial monitor
-  Serial.print(ssidRecv);
-  Serial.print("\t");
-  Serial.println(passRecv);
-
-  // send answer to client
-  request->send(200, "text/plane", "1");
-  xTaskCreate(getWifiConfFromHTTP, "getWifiConfFromHTTP", 4096, (void *)1, 1, NULL);
-}
-void handleADC(AsyncWebServerRequest *request)
-{
-  request->send(200, "text/plane", String(temp));
-}
-void handlePrcStatus(AsyncWebServerRequest *request)
-{
-  String processBtn;
-  if (processStatus)
-  {
-    processBtn="Stop";
-  }
-  else
-  {
-    processBtn="Process"
-  }
-  request->send(200, "text/plane", processBtn);
-}
-void handleNotifyCam(AsyncWebServerRequest *request)
-{
-  String status;
-  if (peerConnected)
-  {
-    status = "CKIT CAM Connected";
-  }
-  else
-  {
-    status = "Couldn't Find CCKIT CAM";
-  }
-  request->send(200, "text/plane", status);
-}
-String message = "Waiting for process";
-void handleMessage(AsyncWebServerRequest *request)
-{
-
-  request->send(200, "text/plane", message);
-}
-void handleRoot(AsyncWebServerRequest *request)
-{
-  Serial.println("Controller connected");
-  request->send(200, "text/html", MAIN_PAGE);
-}
-void handleRootWifi(AsyncWebServerRequest *request)
-{
-  Serial.println("Wifi settings connected");
-  request->send(200, "text/html", SETTINGS_PAGE);
-}
-void handleNotFound(AsyncWebServerRequest *request)
-{
-  request->send(404, "text/html", PAGE_404);
-}
-void handleWifiMode(AsyncWebServerRequest *request)
-{
-
-  String req = request->arg("w");
-
-  Serial.println(req);
-
-  // send answer to client
-  request->send(200, "text/plane", "1");
-  writeWifiMode(0);
-  vTaskDelay(2000 / portTICK_PERIOD_MS);
-  ESP.restart();
-}
-
-IPAddress IP;
 void setup()
 {
-
   Serial.begin(115200);
   if (!EEPROM.begin(512))
   {
     Serial.println("failed to init EEPROM");
   }
   Serial.println("CCKIT Main");
-  // writeWifiMode(0);
   mode = loadWifiMode();
-  // saveToEEPROM("Aykut", "edirne12345");
   loadFromEEPROM();
   if (mode == 1)
   {
@@ -213,9 +39,9 @@ void setup()
   else
   {
     WiFi.mode(WIFI_AP);
-     WiFi.softAP(ssidAP, passwordAP);
+    WiFi.softAP(ssidAP, passwordAP);
     WiFi.softAPConfig(staticIP, gateway, subnet);
-   
+
     IP = WiFi.softAPIP();
     Serial.println(IP);
   }
@@ -228,22 +54,22 @@ void setup()
   }
   esp_now_register_send_cb(OnDataSent);
   esp_now_register_recv_cb(OnDataRecv);
+
   startPage();
   initBroadcastSlave();
+  myPID.setBangBang(4);
+  myPID.setTimeStep(4000);
 }
 
 void loop()
 {
   if (Serial.available() > 0)
   {
-    // read the incoming string:
     message = Serial.readString();
   }
   broadcast();
   sendData("pulse", 1);
   sendDebugMessages(100);
-  // Serial.print("AP IP address: ");
-  // Serial.println(IP);
   vTaskDelay(100 / portTICK_PERIOD_MS);
 }
 void processData(std::string value)
@@ -290,7 +116,12 @@ void sendDebugMessages(int tick)
   static unsigned long previousMillis = 0;
   if (currentMillis - previousMillis >= tick)
   {
+#ifdef DEBUG
     Serial.printf("Temp:%.2f\t Humudity:%.2f\t PeerStatus:%d WifiMode:%d\t \n", temp, hum, peerConnected, mode);
+#endif
+#ifdef PIDDEBUG
+    Serial.printf("Current Temp:%f\tTarget Temp:%f\tTemp Output:%f\t \n", temp, targetTemp, tempOutputVal);
+#endif
     previousMillis = currentMillis;
   }
 }
@@ -330,11 +161,15 @@ void startPage()
   if (mode == 1)
   {
     server.on("/", HTTP_GET, handleRoot);
-    server.on("/readADC", HTTP_GET, handleADC);
+    server.on("/liveData", HTTP_GET, handleLiveData);
     server.on("/readPrcButton", HTTP_GET, handlePrcStatus);
     server.on("/setLED", HTTP_GET, handleLED);
     server.on("/setRGB", HTTP_GET, handleRGB);
     server.on("/setWifiMode", HTTP_GET, handleWifiMode);
+      server.on("/flashToggle", HTTP_GET, handleFlash);
+  
+    server.on("/message", HTTP_GET, handleMessage);
+       server.on("/notifyCAM", HTTP_GET, handleNotifyCam);
     server.onNotFound(handleNotFound);
   }
   else
@@ -472,10 +307,7 @@ void getWifiConfFromHTTP(void *parameter)
   }
   if (!camWifiSettingResponse)
   {
-    message = "Timeout: no response from cam module";
-    vTaskDelay(3000 / portTICK_PERIOD_MS);
-    Serial.println("Timeout: no response from cam module");
-    message = "Done. Restarting...";
+    message = "Timeout: No response from cam module. Main setted successfully. Restarting on STA Mode...";
     saveToEEPROM(ssidRecv, passRecv);
     writeWifiMode(1); // set sta mode
     vTaskDelay(5000 / portTICK_PERIOD_MS);
@@ -483,7 +315,7 @@ void getWifiConfFromHTTP(void *parameter)
   }
   else
   {
-    message = "Done. Restarting...";
+    message = "CAM and Main setted successfully. Restarting on STA Mode...";
     saveToEEPROM(ssidRecv, passRecv);
     writeWifiMode(1); // set sta mode
     vTaskDelay(5000 / portTICK_PERIOD_MS);
