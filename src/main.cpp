@@ -57,6 +57,13 @@ void setup()
 
   startPage();
   initBroadcastSlave();
+    xTaskCreate(
+      displayTask,              /* Function to implement the task */
+      "Task1",                  /* Name of the task */
+      10000,                    /* Stack size in words */
+      NULL,                     /* Task input parameter */
+      1,                        /* Priority of the task */
+      NULL /* Task handle. */); /* Core where the task should run */
   myPID.setBangBang(4);
   myPID.setTimeStep(4000);
 }
@@ -332,4 +339,62 @@ void writeWifiMode(uint8_t mode)
 uint8_t loadWifiMode()
 {
   return EEPROM.read(511);
+}
+void initDisplay()
+{
+ if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { 
+    Serial.println(F("SSD1306 allocation failed"));
+    for(;;); // Don't proceed, loop forever
+  }
+  display.clearDisplay();
+  display.setFont(&FreeSans9pt7b);
+  display.setTextColor(WHITE);
+  display.setTextSize(1); // Draw 2X-scale text
+  drawCentreString("CCKIT MAIN", 64, 24);
+  display.display();
+  vTaskDelay(500/portTICK_PERIOD_MS);
+}
+void composeDisplay()
+{
+display.clearDisplay();
+    display.setFont(&FreeSans9pt7b);
+    display.setTextColor(SSD1306_WHITE);
+    display.setTextSize(1);
+    drawCentreString(WiFi.localIP().toString().c_str(), 64, 29);
+    display.setFont(&SourceSansPro_Regular6pt7b);
+    display.setTextSize(1);
+    display.setCursor(80, 10);
+    display.print((int)temp);
+    display.print("C° ");
+    display.print((int)hum);
+    display.println("% ");
+    drawCentreString(esid.c_str(), 38, 10);
+    if (WiFi.isConnected())
+    {
+
+    }
+    else
+    {
+
+    }
+    display.display();
+}
+void drawCentreString(const char *buf, int x, int y)
+{
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(buf, 0, y, &x1, &y1, &w, &h); // calc width of new string
+  display.setCursor(x - w / 2, y);
+  display.print(buf);
+}
+void displayTask(void *parameter)
+{
+initDisplay();
+  vTaskDelay(2000 / portTICK_PERIOD_MS);
+  for (;;)
+  {
+    composeDisplay();
+    vTaskDelay(200/portTICK_PERIOD_MS);
+  }
+  vTaskDelete(NULL);
 }

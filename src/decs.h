@@ -3,10 +3,24 @@
 #include <esp_now.h>
 #include <WiFi.h>
 #include <AsyncTCP.h>
-
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include "myfonts.h"
 #include "html.h"
 #include "EEPROM.h"
 #include <AutoPID.h>
+#include <Fonts/FreeSans9pt7b.h>
+
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+
+// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+#define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+
 union twoByte
 {
     byte bVal[2];
@@ -73,7 +87,10 @@ void startPage();
 void saveToEEPROM(String qsid, String qpass);
 void loadFromEEPROM();
 void getWifiConfFromHTTP(void *parameter);
-
+void initDisplay();
+void composeDisplay();
+void drawCentreString(const char *buf, int x, int y);
+void displayTask(void *parameter);
 ////////////////HANDLES///////////////
 
 void handleLED(AsyncWebServerRequest *request)
