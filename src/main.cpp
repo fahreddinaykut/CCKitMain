@@ -1,17 +1,22 @@
 #include "decs.h"
 #define PIDDEBUG
+// #define DEBUG
 // pid settings and gains
 #define OUTPUT_MIN 0
 #define OUTPUT_MAX 255
-#define KP .12
-#define KI .0003
-#define KD 0
 
-AutoPID myPID(&temp, &targetTemp, &tempOutputVal, OUTPUT_MIN, OUTPUT_MAX, KP, KI, KD);
+bool ssrState = 0;
 AsyncWebServer server(80);
 
 void setup()
 {
+  pinMode(humidifierPin, OUTPUT);
+  pinMode(heaterFan, OUTPUT);
+  pinMode(ssrPin, OUTPUT);
+  digitalWrite(humidifierPin, HIGH);
+  digitalWrite(heaterFan, HIGH);
+  digitalWrite(ssrPin, LOW);
+
   Serial.begin(115200);
   if (!EEPROM.begin(512))
   {
@@ -20,6 +25,8 @@ void setup()
   Serial.println("CCKIT Main");
   mode = loadWifiMode();
   loadFromEEPROM();
+  vTaskDelay(500/portTICK_PERIOD_MS);
+  loadPIDFromEEPROM();
   if (mode == 1)
   {
     WiFi.mode(WIFI_STA);
@@ -35,6 +42,14 @@ void setup()
     }
     Serial.print("IP Address: ");
     Serial.println(WiFi.localIP());
+  }
+  else if (mode == 2)
+  {
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(ssidAP, passwordAP);
+    WiFi.softAPConfig(staticIP, gateway, subnet);
+
+    IP = WiFi.softAPIP();
   }
   else
   {
@@ -57,15 +72,15 @@ void setup()
 
   startPage();
   initBroadcastSlave();
-    xTaskCreate(
+  xTaskCreate(
       displayTask,              /* Function to implement the task */
       "Task1",                  /* Name of the task */
       10000,                    /* Stack size in words */
       NULL,                     /* Task input parameter */
       1,                        /* Priority of the task */
       NULL /* Task handle. */); /* Core where the task should run */
-  myPID.setBangBang(4);
-  myPID.setTimeStep(4000);
+
+
 }
 
 void loop()
@@ -101,6 +116,9 @@ void processData(std::string value)
   case cmdResponseSetting:
     camWifiSettingResponse = value[1];
     break;
+    case cmdCamTempError:
+    sensorError=value[1];
+    break;
   default:
     break;
   }
@@ -124,10 +142,10 @@ void sendDebugMessages(int tick)
   if (currentMillis - previousMillis >= tick)
   {
 #ifdef DEBUG
-    Serial.printf("Temp:%.2f\t Humudity:%.2f\t PeerStatus:%d WifiMode:%d\t \n", temp, hum, peerConnected, mode);
+    Serial.printf("Temp:%.2f\t Humudity:%.2f\t TarTemp:%d TarHum:%d PeerStatus:%d WifiMode:%d\t \n", temp, hum, targetTemp, targetHum, peerConnected, mode);
 #endif
 #ifdef PIDDEBUG
-    Serial.printf("Current Temp:%f\tTarget Temp:%f\tTemp Output:%f\t \n", temp, targetTemp, tempOutputVal);
+    Serial.printf("Current Temp:%f\tTarget Temp:%f\tSsrState:%d\t KP:%f KI:%f KD:%f \n", temp, targetTemp, ssrState, KP, KI, KD);
 #endif
     previousMillis = currentMillis;
   }
@@ -165,7 +183,7 @@ void configCamWifi(const char *ssid, const char *pass)
 }
 void startPage()
 {
-  if (mode == 1)
+  if (mode == 1 || mode == 2)
   {
     server.on("/", HTTP_GET, handleRoot);
     server.on("/liveData", HTTP_GET, handleLiveData);
@@ -173,16 +191,20 @@ void startPage()
     server.on("/setLED", HTTP_GET, handleLED);
     server.on("/setRGB", HTTP_GET, handleRGB);
     server.on("/setWifiMode", HTTP_GET, handleWifiMode);
-      server.on("/flashToggle", HTTP_GET, handleFlash);
-  
+    server.on("/emgStop", HTTP_GET, handleEmergencyStop);
+    server.on("/flashToggle", HTTP_GET, handleFlash);
     server.on("/message", HTTP_GET, handleMessage);
-       server.on("/notifyCAM", HTTP_GET, handleNotifyCam);
+    server.on("/notifyCAM", HTTP_GET, handleNotifyCam);
+    server.on("/savePID", HTTP_GET, handleSavePID);
+    server.on("/camUpdate", HTTP_GET, handleCamUpdate);
+    
     server.onNotFound(handleNotFound);
   }
   else
   {
     server.on("/", HTTP_GET, handleRootWifi);
     server.on("/setWifi", HTTP_GET, handleWifiSettings);
+    server.on("/startAP", HTTP_GET, handleStartAP);
     server.on("/notifyCAM", HTTP_GET, handleNotifyCam);
     server.on("/message", HTTP_GET, handleMessage);
     server.onNotFound(handleNotFound);
@@ -342,9 +364,11 @@ uint8_t loadWifiMode()
 }
 void initDisplay()
 {
- if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { 
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
+  {
     Serial.println(F("SSD1306 allocation failed"));
-    for(;;); // Don't proceed, loop forever
+    for (;;)
+      ; // Don't proceed, loop forever
   }
   display.clearDisplay();
   display.setFont(&FreeSans9pt7b);
@@ -352,32 +376,30 @@ void initDisplay()
   display.setTextSize(1); // Draw 2X-scale text
   drawCentreString("CCKIT MAIN", 64, 24);
   display.display();
-  vTaskDelay(500/portTICK_PERIOD_MS);
+  vTaskDelay(500 / portTICK_PERIOD_MS);
 }
 void composeDisplay()
 {
-display.clearDisplay();
-    display.setFont(&FreeSans9pt7b);
-    display.setTextColor(SSD1306_WHITE);
-    display.setTextSize(1);
-    drawCentreString(WiFi.localIP().toString().c_str(), 64, 29);
-    display.setFont(&SourceSansPro_Regular6pt7b);
-    display.setTextSize(1);
-    display.setCursor(80, 10);
-    display.print((int)temp);
-    display.print("C° ");
-    display.print((int)hum);
-    display.println("% ");
-    drawCentreString(esid.c_str(), 38, 10);
-    if (WiFi.isConnected())
-    {
-
-    }
-    else
-    {
-
-    }
-    display.display();
+  display.clearDisplay();
+  display.setFont(&FreeSans9pt7b);
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextSize(1);
+  drawCentreString(WiFi.localIP().toString().c_str(), 64, 29);
+  display.setFont(&SourceSansPro_Regular6pt7b);
+  display.setTextSize(1);
+  display.setCursor(80, 10);
+  display.print((int)temp);
+  display.print("C° ");
+  display.print((int)hum);
+  display.println("% ");
+  drawCentreString(esid.c_str(), 38, 10);
+  if (WiFi.isConnected())
+  {
+  }
+  else
+  {
+  }
+  display.display();
 }
 void drawCentreString(const char *buf, int x, int y)
 {
@@ -389,12 +411,118 @@ void drawCentreString(const char *buf, int x, int y)
 }
 void displayTask(void *parameter)
 {
-initDisplay();
+  initDisplay();
   vTaskDelay(2000 / portTICK_PERIOD_MS);
   for (;;)
   {
     composeDisplay();
-    vTaskDelay(200/portTICK_PERIOD_MS);
+    vTaskDelay(200 / portTICK_PERIOD_MS);
   }
   vTaskDelete(NULL);
+}
+
+void processAction(int ttem, int thum)
+{
+  targetHum = thum;
+  targetTemp = ttem;
+  processStatus = 1;
+  Serial.println("processing...");
+  xTaskCreate(
+      humidityTask,             /* Function to implement the task */
+      "humidityTask",           /* Name of the task */
+      4096,                     /* Stack size in words */
+      NULL,                     /* Task input parameter */
+      1,                        /* Priority of the task */
+      NULL /* Task handle. */); /* Core where the task should run */
+  xTaskCreate(
+      heaterTask,               /* Function to implement the task */
+      "heaterTask",             /* Name of the task */
+      4096,                     /* Stack size in words */
+      NULL,                     /* Task input parameter */
+      1,                        /* Priority of the task */
+      NULL /* Task handle. */); /* Core where the task should run */
+}
+void humidityTask(void *parameter)
+{
+  while (processStatus)
+  {
+    if (hum < targetHum)
+    {
+      digitalWrite(humidifierPin, LOW);
+    }
+    else
+    {
+      digitalWrite(humidifierPin, HIGH);
+    }
+    vTaskDelay(500 / portTICK_PERIOD_MS);
+  }
+  digitalWrite(humidifierPin, HIGH);
+  targetHum=0;
+  vTaskDelete(NULL);
+}
+void heaterTask(void *parameter)
+{
+  AutoPIDRelay myPID(&temp, &targetTemp, &ssrState, 5000.0, KP, KI, KI);
+    myPID.setBangBang(20);
+  // set PID update interval to 4000ms
+  myPID.setTimeStep(4000);
+  while (processStatus)
+  {
+     stateHeaterFan(1);
+    myPID.run();
+    stateHeater(ssrState);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+  }
+  myPID.stop();
+  stateHeater(0);
+  targetTemp=0;
+  ssrState=0;
+  while (!digitalRead(heaterFan))
+  {
+    stateHeaterFan(0);
+    vTaskDelay(500 / portTICK_PERIOD_MS);
+  }
+  Serial.println("heater process finished");
+  vTaskDelete(NULL);
+}
+void stateHeater(byte state)
+{
+  if (state)
+  {
+    digitalWrite(ssrPin, HIGH);
+  }
+  else
+  {
+    digitalWrite(ssrPin, LOW);
+    lastHeaterOpen = millis();
+  }
+}
+void stateHeaterFan(byte state)
+{
+  if (state)
+  {
+    digitalWrite(heaterFan, LOW);
+  }
+  else
+  {
+    if (millis() - lastHeaterOpen > MIN_FANTIME)
+    {
+      digitalWrite(heaterFan, HIGH);
+    }
+  }
+}
+void savePIDEEPROM(double p, double i, double d)
+{
+  EEPROM.writeDouble(503, p);
+  EEPROM.writeDouble(495, i);
+  EEPROM.writeDouble(487, d);
+  EEPROM.commit();
+  message = "Saved";
+  loadPIDFromEEPROM();
+}
+void loadPIDFromEEPROM()
+{
+  KP = EEPROM.readDouble(503);
+  KI = EEPROM.readDouble(495);
+  KD = EEPROM.readDouble(487);
 }

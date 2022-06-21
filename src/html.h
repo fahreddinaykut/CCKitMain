@@ -1,6 +1,7 @@
 const char MAIN_PAGE[] = R"=====(
 <!doctype html>
 <html lang="en">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -8,55 +9,184 @@ const char MAIN_PAGE[] = R"=====(
         integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
 
     <style>
-    hr { 
-    display: block;
-    margin-end: auto;
-    margin-start: auto;
-    border: 1px inset;
-    overflow: hidden;
-    margin-before: 0.5em;
-    margin-after: 0.5em;
-}
-            iframe {
-        width: 100%;
-        height: 100%;
-        border: none;
-      }
+        hr {
+            display: block;
+            margin-end: auto;
+            margin-start: auto;
+            border: 1px inset;
+            overflow: hidden;
+            margin-before: 0.5em;
+            margin-after: 0.5em;
+        }
+
+        body {
+            padding-bottom: 80px;
+            font-family: Calibri, Helvetica, sans-serif;
+        }
+
+        .slidecontainer {
+            width: Calc(100% - 100px);
+            margin: 0 auto;
+        }
+
+        .slider {
+            width: Calc(100% - 196px);
+            /*196px means both sides (left 98px and right 98px)*/
+            margin: 0 auto;
+            -webkit-appearance: none;
+            height: 20px;
+            border-radius: 3px;
+            background: #d3d3d3;
+            outline: none;
+            opacity: 1;
+            -webkit-transition: .2s;
+            transition: opacity .2s;
+        }
+
+        .slider:hover {
+            opacity: 0.8;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 40px;
+            height: 25px;
+            border-radius: 10%;
+            background: #099bdd;
+            cursor: pointer;
+        }
+
+        .slider::-moz-range-thumb {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: #099bdd;
+            cursor: pointer;
+        }
+
+        .buttonStyle1 {
+            background-color: #099bdd;
+            border: none;
+            color: white;
+            padding: 10px 24px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            border-radius: 8px;
+            transition-duration: 0.4s;
+            font-family:Arial, Helvetica, sans-serif
+        }
+
+        .buttonStyle2 {
+            background-color: #DF0000;
+            border: none;
+            color: white;
+            padding: 10px 24px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            border-radius: 8px;
+            transition-duration: 0.4s;
+            font-family:Arial, Helvetica, sans-serif
+        }
+
+        .buttonStyle3 {
+            background-color: #616161;
+            border: none;
+            color: white;
+            padding: 10px 24px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            border-radius: 8px;
+            transition-duration: 0.4s;
+            color: white;
+            font-family:Arial, Helvetica, sans-serif
+        }
+        .buttonStyle4 {
+            background-color: #ffffff;
+            border: 2px solid #0097e9;
+            color: white;
+            padding: 10px 24px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            border-radius: 8px;
+            transition-duration: 0.4s;
+            color: black;
+            font-family:Arial, Helvetica, sans-serif
+        }
+        .buttonStyle1:hover {
+            background-color: #067fb7;
+            color: white;
+        }
+
+        .buttonStyle2:hover {
+            background-color: #FF0000;
+            color: white;
+        }
+
+        .buttonStyle3:hover {
+            background-color: #0097e9;
+        }
+        .buttonStyle4:hover {
+            background-color: #0097e9;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
         .btn {
             width: 100%;
             margin: 5px;
+            
         }
 
         .my-text {
             font-size: 20px;
             padding: 10px;
         }
-table, th, td {
 
-    text-align: center;
-     font-family: Arial, Helvetica, sans-serif;
-     margin-bottom: 15px;
-}
+        table,
+        th,
+        td {
+
+            text-align: center;
+
+            margin-bottom: 15px;
+        }
+
         .my-div {
+            margin-right: auto;
+            margin-left: auto;
             margin-bottom: 15px;
 
         }
-           .mydiv {
-    margin-right:auto;
-    margin-left:auto;
-     display: flex;
-  flex-direction: row;
-  justify-content: center;
-}
+
+        .mydiv {
+            margin-right: auto;
+            margin-left: auto;
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+        }
     </style>
 
     <title>CCKIT Main</title>
 </head>
 
 <body>
-    
+
     <div class="container">
-     
+
         <div class="row">
             <div class="col-md-12 col-xs-12">
                 <h1 class="text-center">CCKIT Main</h1>
@@ -64,31 +194,70 @@ table, th, td {
         </div>
 
         <hr>
- <div class="mydiv">
- <table>
-    <tr>
-        <td style="vertical-align:middle;">
-           <b clabel id="camStatus" style="margin-right:30px"></b>
-        </td>
-        <td style="vertical-align:middle;">
-                <button onclick="flashToggle()"  type="button" class="btn btn-primary">Flash Toggle</button>
-        </td>
-    </tr>
-</table>
-         
-      
-          </div>
-          <div>
-          <div style="position:relative;padding-top:56.25%;">
-         <iframe id="iframe1" src="http://192.168.1.150/" frameborder="0" allowfullscreen style="position:absolute;top:0;left:0;width:100%;height:100%;">
-  <p>Your browser does not support iframes.</p>
-</iframe>
-</div>
-</div>
-<hr>
+        <div class="mydiv">
+            <table>
+                <tr>
+                    <td style="vertical-align:middle;">
+                        <b clabel id="camStatus" style="margin-right:30px"></b>
+                    </td>
+                    <td style="vertical-align:middle;">
+                        <button onclick="flashToggle()" type="button" class="buttonStyle4">Flash Toggle</button>
+                    </td>
+                </tr>
+            </table>
+
+
+        </div>
+        <div>
+            <div style="position:relative;padding-top:56.25%;">
+                <iframe id="iframe1" src="http://192.168.1.150/" frameborder="0" allowfullscreen
+                    style="position:absolute;top:0;left:0;width:100%;height:100%;">
+                    <p>Your browser does not support iframes.</p>
+                </iframe>
+            </div>
+        </div>
+        <hr>
         <div class="row">
 
-           
+            <div class="col-md-4 col-xs-12">
+                <div class="col-md-12 col-xs-12">
+                    <h2 class="text-center">Monitor</h2>
+                </div>
+                <hr>
+
+                <table style="width:100%">
+                    <tr>
+                        <td style='font-family: Arial, Helvetica, sans-serif;font-size: larger;'>Current Temperature</td>
+                        <td style='font-family: Arial, Helvetica, sans-serif;font-size: larger;'>Target Temperature</td>
+                    </tr>
+                    
+                    <tr>
+                        <td id="tempVal" style='font-family: Arial, Helvetica, sans-serif;font-size:x-large ;'>16</td>
+                        <td id="tarTempVal" style='font-family: Arial, Helvetica, sans-serif;font-size:x-large ;'>14</td>
+                    </tr>
+                </table>
+                
+                <table style="width:100%">
+                    <tr>
+                        <td style='font-family: Arial, Helvetica, sans-serif;font-size: larger;'>Current Humidity</td>
+                        <td style='font-family: Arial, Helvetica, sans-serif;font-size: larger;'>Target Humidity</td>
+                    </tr>
+                    <tr>
+                        <td id="humVal" style='font-family: Arial, Helvetica, sans-serif;font-size:x-large ;'>16</td>
+                        <td id="tarHumVal" style='font-family: Arial, Helvetica, sans-serif;font-size:x-large ;'>14</td>
+                    </tr>
+                </table>
+                <div class="mydiv">
+                    <h5 id="msg"></h5>
+                </div>
+                <div class="mydiv">
+                    <button onclick="emgStop()" type="button" class="buttonStyle2">Emergency STOP</button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
 
             <div class="col-md-4 col-xs-12">
                 <div class="col-md-12 col-xs-12">
@@ -96,73 +265,57 @@ table, th, td {
                 </div>
                 <hr>
                 <div class="row">
-                  <div class="col-md-8 col-xs-8 div-my">
-
-
-                 <p style="text-align:center">Target Temperature</p>
-                </div>
-                    <div class="col-md-8 col-xs-8 my-div">
-                     
-                        <input id="r" type="range" min="0" max="60" value="0" onchange="updateSliders()">
+                    <div class="my-div">
+                        <h4 style="text-align:center;">Set Temperature</h4>
+                        <hr style="width:40%;text-align:left;margin-left:auto;margin-right:auto">
                     </div>
-                    <div class="col-md-4 col-xs-4 my-div text-center">
-                        <span id="rVal">0%</span>
+                    <div class="slidecontainer">
+                        <input id="r" class="slider" type="range" min="0" max="60" value="0" onchange="updateSliders()">
+                    </div>
+
+                    <div style="text-align:center;margin-left:auto;margin-right:auto" class="my-div">
+                        <h4 id="rVal">0C</h4>
                     </div>
                 </div>
                 <div class="row">
-               <div class="col-md-8 col-xs-8 div-my">
-                <p style="text-align:center">Target Humidity</p>
-                </div>
-                    <div class="col-md-8 col-xs-8 my-div">
-                        <input id="g" type="range" min="0" max="100" value="0"onchange="updateSliders()">
-                        
+                    <div class="my-div">
+                        <h4 style="text-align:center;">Set Humidity</h4>
+                        <hr style="width:50%;text-align:left;margin-left:auto;margin-right:auto">
                     </div>
-                    <div class="col-md-4 col-xs-4 my-div text-center">
-                        <span id="gVal">0%</span>
+                    <div class="slidecontainer">
+                        <input id="g" class="slider" type="range" min="0" max="100" value="0"
+                            onchange="updateSliders()">
                     </div>
+                    <div style="text-align:center;margin-left:auto;margin-right:auto" class="my-div">
+                        <h4 id="gVal">0%</h4>
+                    </div>
+
+
                 </div>
 
-                    
-                    <button id="prcButton" onclick="sendRGB()" type="button" class="btn btn-primary">Process</button>
-                    <button onclick="wifiConfigMode()" type="button" class="btn btn-primary">Start Wifi Config</button>
-                   
-                </div>
 
-               
-             <div class="col-md-4 col-xs-12">
-                <div class="col-md-12 col-xs-12">
-                    <h2 class="text-center">Monitor</h2>
-                </div>
-                 <hr>
+                <button id="prcButton" onclick="sendRGB()" style="float: right;"type="button" class="buttonStyle1">Start Process</button>
+                <button onclick="wifiConfigMode()" type="button" class="buttonStyle3">Start Wifi Config</button>
 
-                                  <table style="width:100%">
-  <tr>
-    <td style='font-weight:bold;'>Current Temperature</td>
-    <td style='font-weight:bold;'>Target Temperature</td>
-  </tr>
-  <tr>
-    <td  id="tempVal">16</td>
-    <td id="tarTempVal">14</td>
-  </tr>
-</table>
-                <table style="width:100%">
-  <tr>
-    <td style='font-weight:bold;'>Current Humidity</td>
-    <td style='font-weight:bold;'>Target Humidity</td>
-  </tr>
-  <tr>
-    <td  id="humVal">16</td>
-    <td id="tarHumVal">14</td>
-  </tr>
-</table> 
-                 <div class="mydiv"> 
-                    <h5 id="msg" ></h5>
-                      </div>
-               
+                <div class="my-div">
+                    <table style="width:100%;margin-top:30px;margin-bottom:30px">
+                        <tr>
+                            <th style="font-size: 22px;">Kp=</th>
+                            <th> <input type="text" style="width: 60px;" id="kpin" name="fname"></th>
+                            <th  style="font-size: 22px;">Ki=</th>
+                            <th> <input type="text" id="kiin" style="width: 60px;" name="fname2"></th>
+                            <th  style="font-size: 22px;">Kd=</th>
+                            <th> <input type="text" id="kdin" style="width: 60px;" name="fname3"></th>
+                        </tr>
+                    </table>
+                    <button onclick="savePID()" type="button" class="buttonStyle3">Save PID Settings</button>
+                    <button onclick="startCamUpdate()" type="button" class="buttonStyle3">Update Camera Firmware</button>
+                </div>
             </div>
-        </div>
-    </div>
 
+
+
+         
     <footer class="container footer">
         <div class="col-md-12 text-center">
 
@@ -170,14 +323,66 @@ table, th, td {
     </footer>
 
     <script>
+        function emgStop() {
+            // wait for answer callback
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (this.readyState == 4 && this.status == 200) {
 
-function updateSliders()
-{
-     var redVal = document.getElementById('r').value;
+                }
+            };
+
+            // create querrystring
+            var sendStr = "emgStop?w=1";
+            // console.log(sendStr);
+
+            // send querrystring using xmlhttprequest
+            xhttp.open("GET", sendStr, true);
+            xhttp.send();
+        }
+        function startCamUpdate() {
+            // wait for answer callback
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (this.readyState == 4 && this.status == 200) {
+
+                }
+            };
+
+            // create querrystring
+            var sendStr = "camUpdate?w=1";
+            // console.log(sendStr);
+
+            // send querrystring using xmlhttprequest
+            xhttp.open("GET", sendStr, true);
+            xhttp.send();
+        }
+        function savePID() {
+            var kpVal = document.getElementById('kpin').value;
+            var kiVal = document.getElementById('kiin').value;
+            var kdVal = document.getElementById('kdin').value;
+            // wait for answer callback
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (this.readyState == 4 && this.status == 200) {
+
+                }
+            };
+
+            // create querrystring
+            var sendStr = "savePID?p=" + kpVal + "&i=" + kiVal + "&d=" + kdVal;
+            // console.log(sendStr);
+
+            // send querrystring using xmlhttprequest
+            xhttp.open("GET", sendStr, true);
+            xhttp.send();
+        }
+        function updateSliders() {
+            var redVal = document.getElementById('r').value;
             var greenVal = document.getElementById('g').value;
-            document.getElementById('rVal').innerHTML = String(redVal)+"C";
-            document.getElementById('gVal').innerHTML = String(greenVal)+"%";
-}
+            document.getElementById('rVal').innerHTML = String(redVal) + "C";
+            document.getElementById('gVal').innerHTML = String(greenVal) + "%";
+        }
         function sendRGB() {
             //get rgb values from sliders
             var redVal = document.getElementById('r').value;
@@ -185,24 +390,24 @@ function updateSliders()
 
 
             // convert rgb values range from 0 - 100 to 0 - 255
-            var r = parseInt(redVal ).toString();
-            var g = parseInt(greenVal ).toString();
+            var r = parseInt(redVal).toString();
+            var g = parseInt(greenVal).toString();
 
             // show slider value in labels
-            document.getElementById('rVal').innerHTML = String(redVal)+"C";
-            document.getElementById('gVal').innerHTML = String(greenVal)+"%";
-           // document.getElementById('txt').innerHTML = String(ssidVal);
+            document.getElementById('rVal').innerHTML = String(redVal) + "C";
+            document.getElementById('gVal').innerHTML = String(greenVal) + "%";
+            // document.getElementById('txt').innerHTML = String(ssidVal);
 
             // wait for answer callback
             var xhttp = new XMLHttpRequest();
             xhttp.onreadystatechange = function () {
                 if (this.readyState == 4 && this.status == 200) {
-                    
+
                 }
             };
 
             // create querrystring
-            var sendStr = "setRGB?r=" + r + "&g=" + g ;
+            var sendStr = "setRGB?r=" + r + "&g=" + g;
             // console.log(sendStr);
 
             // send querrystring using xmlhttprequest
@@ -213,11 +418,11 @@ function updateSliders()
         setInterval(function () {
             // Call a function repetatively with 2 Second interval
             getData();
-            getMessage() ;
+            getMessage();
             notifyCam();
         }, 1000); //2000mSeconds update rate
         function notifyCam() {
-            
+
             var xhttp = new XMLHttpRequest();
             xhttp.onreadystatechange = function () {
                 if (this.readyState == 4 && this.status == 200) {
@@ -230,26 +435,31 @@ function updateSliders()
             xhttp.send();
         }
         function getData() {
-            
             var xhttp = new XMLHttpRequest();
             xhttp.onreadystatechange = function () {
                 if (this.readyState == 4 && this.status == 200) {
                     const myArray = this.responseText.split("|");
                     document.getElementById("tempVal").innerHTML =
-                       myArray[0];
-                       document.getElementById("tarTempVal").innerHTML =
-                       myArray[1];
-                       document.getElementById("humVal").innerHTML =
-                       myArray[2];
-                       document.getElementById("tarHumVal").innerHTML =
-                       myArray[3];
+                        myArray[0];
+                    document.getElementById("tarTempVal").innerHTML =
+                        myArray[1];
+                    document.getElementById("humVal").innerHTML =
+                        myArray[2];
+                    document.getElementById("tarHumVal").innerHTML =
+                        myArray[3];
+                    document.getElementById("kpin").placeholder =
+                        myArray[4];
+                    document.getElementById("kiin").placeholder =
+                        myArray[5];
+                    document.getElementById("kdin").placeholder =
+                        myArray[6];
                     console.log(this.responseText);
                 }
             };
             xhttp.open("GET", "liveData", true);
             xhttp.send();
 
-             var xhttp2 = new XMLHttpRequest();
+            var xhttp2 = new XMLHttpRequest();
             xhttp2.onreadystatechange = function () {
                 if (this.readyState == 4 && this.status == 200) {
                     document.getElementById("prcButton").innerHTML =
@@ -260,8 +470,8 @@ function updateSliders()
             xhttp2.open("GET", "readPrcButton", true);
             xhttp2.send();
         }
-          function getMessage() {
-            
+        function getMessage() {
+
             var xhttp = new XMLHttpRequest();
             xhttp.onreadystatechange = function () {
                 if (this.readyState == 4 && this.status == 200) {
@@ -273,13 +483,13 @@ function updateSliders()
             xhttp.open("GET", "message", true);
             xhttp.send();
         }
-          function wifiConfigMode() {
+        function wifiConfigMode() {
 
             // wait for answer callback
             var xhttp = new XMLHttpRequest();
             xhttp.onreadystatechange = function () {
                 if (this.readyState == 4 && this.status == 200) {
-                    
+
                 }
             };
 
@@ -291,13 +501,13 @@ function updateSliders()
             xhttp.open("GET", sendStr, true);
             xhttp.send();
         }
-         function flashToggle() {
+        function flashToggle() {
 
             // wait for answer callback
             var xhttp = new XMLHttpRequest();
             xhttp.onreadystatechange = function () {
                 if (this.readyState == 4 && this.status == 200) {
-                    
+
                 }
             };
 
@@ -318,7 +528,6 @@ function updateSliders()
         integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa"
         crossorigin="anonymous"></script>
 </body>
-
 </html>
 )=====";
 const char PAGE_404[] = R"====(
@@ -431,6 +640,7 @@ button {
             <label>Password</label>   
             <input type="password" placeholder="Enter Password" id="passwordText" required>  
      <button type="submit"  onclick="sendRGB()">Process</button>   
+     <button type="submit"  onclick="sendAPMode()">Start AP Mode</button>   
            <div class="mydiv">
           <h4 clabel id="msg"></h4>
           </div>
@@ -439,7 +649,25 @@ button {
 </body>     
 
     <script>
+ function sendAPMode() {
+            //get rgb values from sliders
 
+            // wait for answer callback
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (this.readyState == 4 && this.status == 200) {
+                    
+                }
+            };
+
+            // create querrystring
+            var sendStr = "startAP?s=1";
+            // console.log(sendStr);
+
+            // send querrystring using xmlhttprequest
+            xhttp.open("GET", sendStr, true);
+            xhttp.send();
+        }
         function sendRGB() {
             //get rgb values from sliders
             var passVal = document.getElementById('passwordText').value;
