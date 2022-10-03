@@ -1,22 +1,29 @@
 #include "decs.h"
-#define PIDDEBUG
-// #define DEBUG
+#include "GyverPID.h"
+#include <esp_wifi.h>
+// #define PIDDEBUG
+#define DEBUG
 // pid settings and gains
 #define OUTPUT_MIN 0
 #define OUTPUT_MAX 255
-
+#define WATER_LEVEL_PIN 15
+#define WATER_POWER_PIN 18
+int waterLevel = 0;
 bool ssrState = 0;
+char cckitCamMac[18] = {0};
+uint8_t cckitCamMacBytes[6];
+
 AsyncWebServer server(80);
 
 void setup()
 {
+
   pinMode(humidifierPin, OUTPUT);
   pinMode(heaterFan, OUTPUT);
   pinMode(ssrPin, OUTPUT);
   digitalWrite(humidifierPin, HIGH);
   digitalWrite(heaterFan, HIGH);
   digitalWrite(ssrPin, LOW);
-
   Serial.begin(115200);
   if (!EEPROM.begin(512))
   {
@@ -24,14 +31,18 @@ void setup()
   }
   Serial.println("CCKIT Main");
   mode = loadWifiMode();
-  loadFromEEPROM();
-  vTaskDelay(500/portTICK_PERIOD_MS);
-  loadPIDFromEEPROM();
+  functions.loadFromEEPROM();
+  vTaskDelay(500 / portTICK_PERIOD_MS);
+  functions.loadPIDFromEEPROM();
+
   if (mode == 1)
   {
-    WiFi.mode(WIFI_STA);
-    WiFi.config(staticIP, gateway, subnet, dns, dns);
-    WiFi.begin(esid.c_str(), epass.c_str());
+    WiFi.mode(WIFI_AP_STA);
+    ESP_ERROR_CHECK(esp_wifi_set_promiscuous(true));
+    Serial.print("channel:");
+    Serial.println(WiFi.channel());
+    WiFi.config(staticIP, gateway, subnet, dns);
+    WiFi.begin(functions.esid.c_str(), functions.epass.c_str());
     if (WiFi.waitForConnectResult() != WL_CONNECTED)
     {
       Serial.println("WiFi Failed!");
@@ -45,23 +56,32 @@ void setup()
   }
   else if (mode == 2)
   {
-    WiFi.mode(WIFI_AP);
+    WiFi.mode(WIFI_AP_STA);
+    WiFi.softAPConfig(staticIP, gateway, subnet, dns);
     WiFi.softAP(ssidAP, passwordAP);
-    WiFi.softAPConfig(staticIP, gateway, subnet);
-
-    IP = WiFi.softAPIP();
-  }
-  else
-  {
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP(ssidAP, passwordAP);
-    WiFi.softAPConfig(staticIP, gateway, subnet);
 
     IP = WiFi.softAPIP();
     Serial.println(IP);
+    Serial.println("AP mode started");
+  }
+  else
+  {
+    WiFi.mode(WIFI_AP_STA);
+    ESP_ERROR_CHECK(esp_wifi_set_promiscuous(true));
+    uint8_t primaryChan = CHANNEL;
+    wifi_second_chan_t secondChan = WIFI_SECOND_CHAN_NONE;
+    esp_wifi_set_channel(primaryChan, secondChan);
+    ESP_ERROR_CHECK(esp_wifi_set_promiscuous(false));
+    WiFi.softAPConfig(staticIP, gateway, subnet, dns);
+    WiFi.softAP(ssidAP, passwordAP);
+    IP = WiFi.softAPIP();
+    Serial.println("Config mode started");
+    Serial.print("channel:");
+    Serial.println(WiFi.channel());
   }
 
   esp_now_deinit();
+
   if (esp_now_init() != ESP_OK)
   {
     Serial.println("Error initializing ESP-NOW");
@@ -72,27 +92,20 @@ void setup()
 
   startPage();
   initBroadcastSlave();
-  xTaskCreate(
-      displayTask,              /* Function to implement the task */
-      "Task1",                  /* Name of the task */
-      10000,                    /* Stack size in words */
-      NULL,                     /* Task input parameter */
-      1,                        /* Priority of the task */
-      NULL /* Task handle. */); /* Core where the task should run */
-
-
+  xTaskCreatePinnedToCore(
+      displayTask,                 /* Function to implement the task */
+      "Task1",                     /* Name of the task */
+      10000,                       /* Stack size in words */
+      NULL,                        /* Task input parameter */
+      255,                         /* Priority of the task */
+      NULL /* Task handle. */, 1); /* Core where the task should run */
 }
 
 void loop()
 {
-  if (Serial.available() > 0)
-  {
-    message = Serial.readString();
-  }
   broadcast();
-  sendData("pulse", 1);
-  sendDebugMessages(100);
-  vTaskDelay(100 / portTICK_PERIOD_MS);
+  // sendDebugMessages(100);
+  vTaskDelay(1 / portTICK_PERIOD_MS);
 }
 void processData(std::string value)
 {
@@ -104,20 +117,19 @@ void processData(std::string value)
     temptwo.bVal[0] = value[1];
     temptwo.bVal[1] = value[2];
     temp = temptwo.iVal / 10.0;
-    break;
-  case cmdHum:
-    humtwo.bVal[0] = value[1];
-    humtwo.bVal[1] = value[2];
+    humtwo.bVal[0] = value[3];
+    humtwo.bVal[1] = value[4];
     hum = humtwo.iVal / 10.0;
+    if (temp >= 70)
+    {
+      updateProcessStatus(0, 3);
+    }
     break;
-  case cmdCamStatus:
-    camStatus = value[1];
-    break;
-  case cmdResponseSetting:
+  case cmdResponseSetting: // DOESNT WORK
     camWifiSettingResponse = value[1];
     break;
-    case cmdCamTempError:
-    sensorError=value[1];
+  case cmdCamTempError:
+    sensorError = value[1];
     break;
   default:
     break;
@@ -125,15 +137,23 @@ void processData(std::string value)
 }
 void broadcast()
 {
-  slave.channel = CHANNEL; // pick a channel
-  slave.encrypt = 0;       // no encryption
-  for (int ii = 0; ii < 6; ++ii)
+  unsigned long currentMillis = millis();
+  static unsigned long previousMillis = 0;
+  if (currentMillis - previousMillis >= 500)
   {
-    slave.peer_addr[ii] = (uint8_t)0xff;
+    slave.channel = CHANNEL; // pick a channel
+    slave.encrypt = 0;       // no encryption
+    for (int ii = 0; ii < 6; ++ii)
+    {
+      slave.peer_addr[ii] = (uint8_t)0xff;
+    }
+    broadcast_message data;
+    ((String) "main").toCharArray(data.device, 16);
+    ((String) "broadcast").toCharArray(data.type, 16);
+    esp_err_t result = esp_now_send(slave.peer_addr, (uint8_t *)&data, sizeof(data));
+    sendData("pulse", 1);
+    previousMillis = currentMillis;
   }
-  broadcast_message data;
-  ((String) "broadcast").toCharArray(data.type, 16);
-  esp_err_t result = esp_now_send(slave.peer_addr, (uint8_t *)&data, sizeof(data));
 }
 void sendDebugMessages(int tick)
 {
@@ -142,7 +162,7 @@ void sendDebugMessages(int tick)
   if (currentMillis - previousMillis >= tick)
   {
 #ifdef DEBUG
-    Serial.printf("Temp:%.2f\t Humudity:%.2f\t TarTemp:%d TarHum:%d PeerStatus:%d WifiMode:%d\t \n", temp, hum, targetTemp, targetHum, peerConnected, mode);
+    Serial.printf("Temp:%.2f\t Humudity:%.2f\t TarTemp:%d TarHum:%d CamStatus:%d WifiMode:%d CamLastreceive:%d\n", temp, hum, targetTemp, targetHum, camStatus, mode, camLastReceive);
 #endif
 #ifdef PIDDEBUG
     Serial.printf("Current Temp:%f\tTarget Temp:%f\tSsrState:%d\t KP:%f KI:%f KD:%f \n", temp, targetTemp, ssrState, KP, KI, KD);
@@ -154,7 +174,7 @@ void sendData(std::string incomingdata, uint8_t len)
 {
   broadcast_message data;
   data.datalen = len;
-
+  ((String) "main").toCharArray(data.device, 16);
   ((String) "data").toCharArray(data.type, 16);
   for (int i = 0; i < incomingdata.length(); i++)
   {
@@ -188,16 +208,17 @@ void startPage()
     server.on("/", HTTP_GET, handleRoot);
     server.on("/liveData", HTTP_GET, handleLiveData);
     server.on("/readPrcButton", HTTP_GET, handlePrcStatus);
+    server.on("/readToast", HTTP_GET, handleToast);
     server.on("/setLED", HTTP_GET, handleLED);
-    server.on("/setRGB", HTTP_GET, handleRGB);
+    server.on("/setRGB", HTTP_GET, handleProcess);
     server.on("/setWifiMode", HTTP_GET, handleWifiMode);
     server.on("/emgStop", HTTP_GET, handleEmergencyStop);
     server.on("/flashToggle", HTTP_GET, handleFlash);
     server.on("/message", HTTP_GET, handleMessage);
     server.on("/notifyCAM", HTTP_GET, handleNotifyCam);
     server.on("/savePID", HTTP_GET, handleSavePID);
-    server.on("/camUpdate", HTTP_GET, handleCamUpdate);
-    
+    server.on("/camUpdate", HTTP_GET, handleCamUpdate); // readToast
+
     server.onNotFound(handleNotFound);
   }
   else
@@ -213,57 +234,7 @@ void startPage()
   // start server
   server.begin();
 }
-void loadFromEEPROM()
-{
-  for (int i = 0; i < 32; ++i)
-  {
-    byte readValue = EEPROM.read(i);
 
-    if (readValue == '|')
-    {
-      break;
-    }
-
-    esid += char(readValue);
-  }
-  Serial.println();
-  Serial.print("SSID: ");
-  Serial.println(esid);
-  Serial.println("Reading EEPROM pass");
-  for (int i = 32; i < 96; ++i)
-  {
-    byte readValue = EEPROM.read(i);
-
-    if (readValue == '|')
-    {
-      break;
-    }
-
-    epass += char(readValue);
-  }
-  Serial.print("PASS: ");
-  Serial.println(epass);
-}
-void saveToEEPROM(String qsid, String qpass)
-{
-  qsid.concat("|");
-  qpass.concat("|");
-  Serial.println("writing eeprom ssid:");
-  for (int i = 0; i < qsid.length(); ++i)
-  {
-    EEPROM.write(i, qsid[i]);
-    Serial.print("Wrote: ");
-    Serial.println(qsid[i]);
-  }
-  Serial.println("writing eeprom pass:");
-  for (int i = 0; i < qpass.length(); ++i)
-  {
-    EEPROM.write(32 + i, qpass[i]);
-    Serial.print("Wrote: ");
-    Serial.println(qpass[i]);
-  }
-  EEPROM.commit();
-}
 void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int len)
 {
   broadcast_message myData;
@@ -271,22 +242,36 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int len)
 
   if ((String)myData.type == "broadcast")
   {
-    esp_now_peer_info_t mypeerInf;
-    mypeerInf.channel = CHANNEL;
-    mypeerInf.encrypt = 0;
-    mypeerInf.ifidx = WIFI_IF_STA;
-    memcpy(mypeerInf.peer_addr, mac_addr, 6);
-    if (!esp_now_is_peer_exist(mac_addr))
-      if (esp_now_add_peer(&mypeerInf) != ESP_OK)
-      {
-        Serial.println("peer couldn't added");
-        return;
-      }
-      else
-      {
-        peerConnected = 1;
-        Serial.println("peer connected");
-      }
+    if ((String)myData.device == "camera")
+    {
+      camLastReceive = millis();
+      esp_now_peer_info_t mypeerInf;
+      mypeerInf.channel = CHANNEL;
+      mypeerInf.encrypt = 0;
+      mypeerInf.ifidx = WIFI_IF_STA;
+      memcpy(mypeerInf.peer_addr, mac_addr, 6);
+      if (!esp_now_is_peer_exist(mac_addr))
+        if (esp_now_add_peer(&mypeerInf) != ESP_OK)
+        {
+          Serial.println("peer couldn't added");
+          return;
+        }
+        else
+        {
+          sprintf(cckitCamMac, // save macadress in variables library
+                  "%02X:%02X:%02X:%02X:%02X:%02X",
+                  mac_addr[0],
+                  mac_addr[1],
+                  mac_addr[2],
+                  mac_addr[3],
+                  mac_addr[4],
+                  mac_addr[5]);
+          memcpy(cckitCamMacBytes, mac_addr, 6);
+          camStatus = 1;
+          Serial.println("Cam connected");
+          functions.toastMessage = "Camera Connected";
+        }
+    }
   }
   else if ((String)myData.type == "data")
   {
@@ -298,10 +283,6 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int len)
     }
     processData(s);
   }
-  else if ((String)myData.type == "unknown")
-  {
-    Serial.println("unkown data received");
-  }
   else
   {
     Serial.println("type error");
@@ -309,19 +290,28 @@ void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int len)
 }
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status)
 {
-  if (status == ESP_NOW_SEND_SUCCESS)
+  char macStr[18] PROGMEM = {0};
+  sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+
+  if ((String)macStr == (String)cckitCamMac)
   {
-  }
-  else
-  {
-    esp_err_t delStatus = esp_now_del_peer(mac_addr);
-    peerConnected = 0;
-    Serial.println("peer disconnected");
+    if (status == ESP_NOW_SEND_SUCCESS)
+    {
+      camStatus = 1;
+    }
+    else
+    {
+      esp_err_t delStatus = esp_now_del_peer(mac_addr);
+      camStatus = 0;
+      Serial.println("peer disconnected");
+      functions.toastMessage = "Camera Disconnected";
+      processStatus = 0;
+    }
   }
 }
 void getWifiConfFromHTTP(void *parameter)
 {
-  message = "Processing config...";
+  functions.message = "Processing config...";
   broadcast_message data;
   ((String) "wificonfig").toCharArray(data.type, 16);
   (ssidRecv).toCharArray(data.ssid, 16);
@@ -336,20 +326,16 @@ void getWifiConfFromHTTP(void *parameter)
   }
   if (!camWifiSettingResponse)
   {
-    message = "Timeout: No response from cam module. Main setted successfully. Restarting on STA Mode...";
-    saveToEEPROM(ssidRecv, passRecv);
-    writeWifiMode(1); // set sta mode
-    vTaskDelay(5000 / portTICK_PERIOD_MS);
-    ESP.restart();
+    functions.message = "Timeout: No response from cam module. Main setted successfully. Connect to WIFI that you init and refresh the page.";
   }
   else
   {
-    message = "CAM and Main setted successfully. Restarting on STA Mode...";
-    saveToEEPROM(ssidRecv, passRecv);
-    writeWifiMode(1); // set sta mode
-    vTaskDelay(5000 / portTICK_PERIOD_MS);
-    ESP.restart();
+    functions.message = "CAM and Main setted successfully. Connect to WIFI that you init and refresh the page.";
   }
+  functions.saveToEEPROM(ssidRecv, passRecv);
+  writeWifiMode(1); // set sta mode
+  vTaskDelay(5000 / portTICK_PERIOD_MS);
+  ESP.restart();
   vTaskDelete(NULL);
 }
 
@@ -381,25 +367,30 @@ void initDisplay()
 void composeDisplay()
 {
   display.clearDisplay();
-  display.setFont(&FreeSans9pt7b);
-  display.setTextColor(SSD1306_WHITE);
-  display.setTextSize(1);
-  drawCentreString(WiFi.localIP().toString().c_str(), 64, 29);
-  display.setFont(&SourceSansPro_Regular6pt7b);
-  display.setTextSize(1);
-  display.setCursor(80, 10);
-  display.print((int)temp);
-  display.print("C° ");
-  display.print((int)hum);
-  display.println("% ");
-  drawCentreString(esid.c_str(), 38, 10);
-  if (WiFi.isConnected())
+  if (mode == 1)
   {
+    char sensorDisplay[100];
+    display.setFont(&FreeSans9pt7b);
+    display.setTextColor(SSD1306_WHITE);
+    display.setTextSize(1);
+    drawCentreString(WiFi.localIP().toString().c_str(), 64, 34);
+    display.setFont(&SourceSansPro_Regular6pt7b);
+    sprintf(sensorDisplay, "%dC %dH", (int)temp, (int)hum);
+    drawCentreString(sensorDisplay, 64, 58);
+    drawCentreString(functions.esid.c_str(), 64, 12);
   }
-  else
+  else if (mode == 0)
   {
+    display.setFont(&SourceSansPro_Regular6pt7b);
+    display.setTextColor(SSD1306_WHITE);
+    display.setTextSize(1);
+    drawCentreString("CCKIT 192.168.1.151", 64, 12);
+    display.setFont(&FreeSans9pt7b);
+    drawCentreString("WIFI CONFIG", 64, 34);
   }
+
   display.display();
+  vTaskDelay(50 / portTICK_PERIOD_MS);
 }
 void drawCentreString(const char *buf, int x, int y)
 {
@@ -416,7 +407,7 @@ void displayTask(void *parameter)
   for (;;)
   {
     composeDisplay();
-    vTaskDelay(200 / portTICK_PERIOD_MS);
+    vTaskDelay(100 / portTICK_PERIOD_MS);
   }
   vTaskDelete(NULL);
 }
@@ -425,22 +416,30 @@ void processAction(int ttem, int thum)
 {
   targetHum = thum;
   targetTemp = ttem;
-  processStatus = 1;
-  Serial.println("processing...");
-  xTaskCreate(
-      humidityTask,             /* Function to implement the task */
-      "humidityTask",           /* Name of the task */
-      4096,                     /* Stack size in words */
-      NULL,                     /* Task input parameter */
-      1,                        /* Priority of the task */
-      NULL /* Task handle. */); /* Core where the task should run */
-  xTaskCreate(
-      heaterTask,               /* Function to implement the task */
-      "heaterTask",             /* Name of the task */
-      4096,                     /* Stack size in words */
-      NULL,                     /* Task input parameter */
-      1,                        /* Priority of the task */
-      NULL /* Task handle. */); /* Core where the task should run */
+
+  if (!sensorError && camStatus)
+  {
+    updateProcessStatus(1, 2);
+    xTaskCreate(
+        humidityTask,             /* Function to implement the task */
+        "humidityTask",           /* Name of the task */
+        4096,                     /* Stack size in words */
+        NULL,                     /* Task input parameter */
+        1,                        /* Priority of the task */
+        NULL /* Task handle. */); /* Core where the task should run */
+    xTaskCreate(
+        heaterTask,               /* Function to implement the task */
+        "heaterTask",             /* Name of the task */
+        4096,                     /* Stack size in words */
+        NULL,                     /* Task input parameter */
+        1,                        /* Priority of the task */
+        NULL /* Task handle. */); /* Core where the task should run */
+  }
+  else
+  {
+    updateProcessStatus(0, 2);
+    functions.message = "Cannot read data from sensor";
+  }
 }
 void humidityTask(void *parameter)
 {
@@ -449,34 +448,51 @@ void humidityTask(void *parameter)
     if (hum < targetHum)
     {
       digitalWrite(humidifierPin, LOW);
+      humidifierStatus = 1;
     }
     else
     {
       digitalWrite(humidifierPin, HIGH);
+      humidifierStatus = 0;
     }
     vTaskDelay(500 / portTICK_PERIOD_MS);
   }
+  Serial.println("Humidication stopped.");
   digitalWrite(humidifierPin, HIGH);
-  targetHum=0;
+  targetHum = 0;
   vTaskDelete(NULL);
 }
+
+GyverPID regulator(functions.KP, functions.KI, functions.KD, 1000);
+
 void heaterTask(void *parameter)
 {
-  AutoPIDRelay myPID(&temp, &targetTemp, &ssrState, 5000.0, KP, KI, KI);
-    myPID.setBangBang(20);
-  // set PID update interval to 4000ms
-  myPID.setTimeStep(4000);
+
+  regulator.setDirection(NORMAL);
+  regulator.setLimits(0, 1);
+  regulator.setpoint = targetTemp;
+
+  regulator.Kp = functions.KP;
+  regulator.Ki = functions.KI;
+  regulator.Kd = functions.KD;
+
   while (processStatus)
   {
-     stateHeaterFan(1);
-    myPID.run();
-    stateHeater(ssrState);
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+      regulator.input = temp;
+      stateHeaterFan(1);
+      ssrState = regulator.getResultTimer();
+      stateHeater(ssrState);
+      Serial.print("state:");
+      Serial.println(ssrState);
+    
+
+    vTaskDelay(500 / portTICK_PERIOD_MS);
   }
-  myPID.stop();
+
   stateHeater(0);
-  targetTemp=0;
-  ssrState=0;
+  targetTemp = 0;
+  ssrState = 0;
   while (!digitalRead(heaterFan))
   {
     stateHeaterFan(0);
@@ -502,27 +518,58 @@ void stateHeaterFan(byte state)
   if (state)
   {
     digitalWrite(heaterFan, LOW);
+    heaterStatus = 1;
   }
   else
   {
     if (millis() - lastHeaterOpen > MIN_FANTIME)
     {
       digitalWrite(heaterFan, HIGH);
+      heaterStatus = 0;
     }
   }
 }
-void savePIDEEPROM(double p, double i, double d)
+void updateProcessStatus(byte status, byte message)
 {
-  EEPROM.writeDouble(503, p);
-  EEPROM.writeDouble(495, i);
-  EEPROM.writeDouble(487, d);
-  EEPROM.commit();
-  message = "Saved";
-  loadPIDFromEEPROM();
-}
-void loadPIDFromEEPROM()
-{
-  KP = EEPROM.readDouble(503);
-  KI = EEPROM.readDouble(495);
-  KD = EEPROM.readDouble(487);
+  if (status)
+  {
+    processStatus = 1;
+    if (message == 1)
+    {
+      functions.toastMessage = "Process Started";
+      functions.message = "Process Started";
+    }
+    else if (message == 2)
+    {
+      functions.message = "Running...";
+    }
+  }
+  else
+  {
+    if (message == 1)
+    {
+      functions.message = "Process stopped";
+      functions.toastMessage = "Process Stopped";
+    }
+    else if (message == 2)
+    {
+      functions.message = "Cannot receive data from CCKIT-CAM";
+      functions.toastMessage = "Cannot receive data from CCKIT-CAM";
+    }
+    else if (message == 3)
+    {
+      functions.message = "Reached MAX Temperature";
+      functions.toastMessage = "Reached MAX Temperature";
+    }
+    else if (message == 4)
+    {
+      functions.message = "Current Temperature is too high according to target temperature";
+      functions.toastMessage = "Current Temperature is too high according to target temperature";
+    }
+    processStatus = 0;
+    targetTemp = 0;
+    targetHum = 0;
+    temp = 0;
+    hum = 0;
+  }
 }

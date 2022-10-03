@@ -76,7 +76,7 @@ const char MAIN_PAGE[] = R"=====(
             font-size: 16px;
             border-radius: 8px;
             transition-duration: 0.4s;
-            font-family:Arial, Helvetica, sans-serif
+            font-family: Arial, Helvetica, sans-serif
         }
 
         .buttonStyle2 {
@@ -90,7 +90,7 @@ const char MAIN_PAGE[] = R"=====(
             font-size: 16px;
             border-radius: 8px;
             transition-duration: 0.4s;
-            font-family:Arial, Helvetica, sans-serif
+            font-family: Arial, Helvetica, sans-serif
         }
 
         .buttonStyle3 {
@@ -105,8 +105,9 @@ const char MAIN_PAGE[] = R"=====(
             border-radius: 8px;
             transition-duration: 0.4s;
             color: white;
-            font-family:Arial, Helvetica, sans-serif
+            font-family: Arial, Helvetica, sans-serif
         }
+
         .buttonStyle4 {
             background-color: #ffffff;
             border: 2px solid #0097e9;
@@ -119,8 +120,9 @@ const char MAIN_PAGE[] = R"=====(
             border-radius: 8px;
             transition-duration: 0.4s;
             color: black;
-            font-family:Arial, Helvetica, sans-serif
+            font-family: Arial, Helvetica, sans-serif
         }
+
         .buttonStyle1:hover {
             background-color: #067fb7;
             color: white;
@@ -134,20 +136,113 @@ const char MAIN_PAGE[] = R"=====(
         .buttonStyle3:hover {
             background-color: #0097e9;
         }
+
         .buttonStyle4:hover {
             background-color: #0097e9;
         }
 
-        iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
+        .center {
+            margin-left: auto;
+            margin-right: auto;
         }
+
+        #snackbar {
+            visibility: hidden;
+            /* Hidden by default. Visible on click */
+            min-width: 250px;
+            /* Set a default minimum width */
+            margin-left: -125px;
+            /* Divide value of min-width by 2 */
+            background-color: #333;
+            /* Black background color */
+            color: #fff;
+            /* White text color */
+            text-align: center;
+            /* Centered text */
+            border-radius: 2px;
+            /* Rounded borders */
+            padding: 16px;
+            /* Padding */
+            position: fixed;
+            /* Sit on top of the screen */
+            z-index: 1;
+            /* Add a z-index if needed */
+            left: 50%;
+            /* Center the snackbar */
+            bottom: 30px;
+            /* 30px from the bottom */
+        }
+
+        /* Show the snackbar when clicking on a button (class added with JavaScript) */
+        #snackbar.show {
+            visibility: visible;
+            /* Show the snackbar */
+            /* Add animation: Take 0.5 seconds to fade in and out the snackbar.
+  However, delay the fade out process for 2.5 seconds */
+            -webkit-animation: fadein 0.5s, fadeout 0.5s 2.5s;
+            animation: fadein 0.5s, fadeout 0.5s 2.5s;
+        }
+
+        @-webkit-keyframes fadein {
+            from {
+                bottom: 0;
+                opacity: 0;
+            }
+
+            to {
+                bottom: 30px;
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadein {
+            from {
+                bottom: 0;
+                opacity: 0;
+            }
+
+            to {
+                bottom: 30px;
+                opacity: 1;
+            }
+        }
+
+        @-webkit-keyframes fadeout {
+            from {
+                bottom: 30px;
+                opacity: 1;
+            }
+
+            to {
+                bottom: 0;
+                opacity: 0;
+            }
+        }
+
+        @keyframes fadeout {
+            from {
+                bottom: 30px;
+                opacity: 1;
+            }
+
+            to {
+                bottom: 0;
+                opacity: 0;
+            }
+        }
+
+      iframe {
+    display: block;       /* iframes are inline by default */
+    background: #000;
+    border: none;         /* Reset default border */
+    height: 70vh;        /* Viewport-relative units */
+    width: 90vw;
+}
 
         .btn {
             width: 100%;
             margin: 5px;
-            
+
         }
 
         .my-text {
@@ -192,8 +287,10 @@ const char MAIN_PAGE[] = R"=====(
                 <h1 class="text-center">CCKIT Main</h1>
             </div>
         </div>
-
+       
+      
         <hr>
+
         <div class="mydiv">
             <table>
                 <tr>
@@ -210,13 +307,17 @@ const char MAIN_PAGE[] = R"=====(
         </div>
         <div>
             <div style="position:relative;padding-top:56.25%;">
-                <iframe id="iframe1" src="http://192.168.1.150/" frameborder="0" allowfullscreen
-                    style="position:absolute;top:0;left:0;width:100%;height:100%;">
+                <iframe id="iframe1" src="http://192.168.1.150/">
                     <p>Your browser does not support iframes.</p>
                 </iframe>
             </div>
         </div>
         <hr>
+        <div class="row">
+            <div class="col-md-12 col-xs-12">
+                <h5 id="lagText" class="text-center">lag</h5>
+            </div>
+        </div>
         <div class="row">
 
             <div class="col-md-4 col-xs-12">
@@ -224,20 +325,29 @@ const char MAIN_PAGE[] = R"=====(
                     <h2 class="text-center">Monitor</h2>
                 </div>
                 <hr>
-
                 <table style="width:100%">
                     <tr>
-                        <td style='font-family: Arial, Helvetica, sans-serif;font-size: larger;'>Current Temperature</td>
+                        <td style='font-family: Arial, Helvetica, sans-serif;font-size: larger;'>Heater Status</td>
+                        <td style='font-family: Arial, Helvetica, sans-serif;font-size: larger;'>Humidifier Status</td>
+                    </tr>
+                    <tr>
+                        <td id="heaterStatus" style='font-family: Arial, Helvetica, sans-serif;font-size:x-large ;'>OFF
+                        </td>
+                        <td id="humidifierStatus" style='font-family: Arial, Helvetica, sans-serif;font-size:x-large ;'>
+                            OFF</td>
+                    </tr>
+
+                    <tr>
+                        <td style='font-family: Arial, Helvetica, sans-serif;font-size: larger;'>Current Temperature
+                        </td>
                         <td style='font-family: Arial, Helvetica, sans-serif;font-size: larger;'>Target Temperature</td>
                     </tr>
-                    
+
                     <tr>
                         <td id="tempVal" style='font-family: Arial, Helvetica, sans-serif;font-size:x-large ;'>16</td>
-                        <td id="tarTempVal" style='font-family: Arial, Helvetica, sans-serif;font-size:x-large ;'>14</td>
+                        <td id="tarTempVal" style='font-family: Arial, Helvetica, sans-serif;font-size:x-large ;'>14
+                        </td>
                     </tr>
-                </table>
-                
-                <table style="width:100%">
                     <tr>
                         <td style='font-family: Arial, Helvetica, sans-serif;font-size: larger;'>Current Humidity</td>
                         <td style='font-family: Arial, Helvetica, sans-serif;font-size: larger;'>Target Humidity</td>
@@ -247,6 +357,7 @@ const char MAIN_PAGE[] = R"=====(
                         <td id="tarHumVal" style='font-family: Arial, Helvetica, sans-serif;font-size:x-large ;'>14</td>
                     </tr>
                 </table>
+
                 <div class="mydiv">
                     <h5 id="msg"></h5>
                 </div>
@@ -259,63 +370,63 @@ const char MAIN_PAGE[] = R"=====(
     </div>
 
 
-            <div class="col-md-4 col-xs-12">
-                <div class="col-md-12 col-xs-12">
-                    <h2 class="text-center">Controller</h2>
-                </div>
-                <hr>
-                <div class="row">
-                    <div class="my-div">
-                        <h4 style="text-align:center;">Set Temperature</h4>
-                        <hr style="width:40%;text-align:left;margin-left:auto;margin-right:auto">
-                    </div>
-                    <div class="slidecontainer">
-                        <input id="r" class="slider" type="range" min="0" max="60" value="0" onchange="updateSliders()">
-                    </div>
+    <div class="col-md-4 col-xs-12">
+        <div class="col-md-12 col-xs-12">
+            <h2 class="text-center">Controller</h2>
+        </div>
+        <hr>
+        <div class="row">
+            <div class="my-div">
+                <h4 style="text-align:center;">Set Temperature</h4>
+                <hr style="width:40%;text-align:left;margin-left:auto;margin-right:auto">
+            </div>
+            <div class="slidecontainer">
+                <input id="r" class="slider" type="range" min="0" max="60" value="0" oninput="updateSliders()">
+            </div>
 
-                    <div style="text-align:center;margin-left:auto;margin-right:auto" class="my-div">
-                        <h4 id="rVal">0C</h4>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="my-div">
-                        <h4 style="text-align:center;">Set Humidity</h4>
-                        <hr style="width:50%;text-align:left;margin-left:auto;margin-right:auto">
-                    </div>
-                    <div class="slidecontainer">
-                        <input id="g" class="slider" type="range" min="0" max="100" value="0"
-                            onchange="updateSliders()">
-                    </div>
-                    <div style="text-align:center;margin-left:auto;margin-right:auto" class="my-div">
-                        <h4 id="gVal">0%</h4>
-                    </div>
-
-
-                </div>
-
-
-                <button id="prcButton" onclick="sendRGB()" style="float: right;"type="button" class="buttonStyle1">Start Process</button>
-                <button onclick="wifiConfigMode()" type="button" class="buttonStyle3">Start Wifi Config</button>
-
-                <div class="my-div">
-                    <table style="width:100%;margin-top:30px;margin-bottom:30px">
-                        <tr>
-                            <th style="font-size: 22px;">Kp=</th>
-                            <th> <input type="text" style="width: 60px;" id="kpin" name="fname"></th>
-                            <th  style="font-size: 22px;">Ki=</th>
-                            <th> <input type="text" id="kiin" style="width: 60px;" name="fname2"></th>
-                            <th  style="font-size: 22px;">Kd=</th>
-                            <th> <input type="text" id="kdin" style="width: 60px;" name="fname3"></th>
-                        </tr>
-                    </table>
-                    <button onclick="savePID()" type="button" class="buttonStyle3">Save PID Settings</button>
-                    <button onclick="startCamUpdate()" type="button" class="buttonStyle3">Update Camera Firmware</button>
-                </div>
+            <div style="text-align:center;margin-left:auto;margin-right:auto" class="my-div">
+                <h4 id="rVal">0C</h4>
+            </div>
+        </div>
+        <div class="row">
+            <div class="my-div">
+                <h4 style="text-align:center;">Set Humidity</h4>
+                <hr style="width:50%;text-align:left;margin-left:auto;margin-right:auto">
+            </div>
+            <div class="slidecontainer">
+                <input id="g" class="slider" type="range" min="0" max="100" value="0" oninput="updateSliders()">
+            </div>
+            <div style="text-align:center;margin-left:auto;margin-right:auto" class="my-div">
+                <h4 id="gVal">0%</h4>
             </div>
 
 
+        </div>
 
-         
+
+        <button id="prcButton" onclick="sendRGB()" style="float: right;" type="button" class="buttonStyle1">Start
+            Process</button>
+        <button onclick="wifiConfigMode()" type="button" class="buttonStyle3">Start Wifi Config</button>
+
+        <div class="my-div">
+            <table style="width:100%;margin-top:30px;margin-bottom:30px">
+                <tr>
+                    <th style="font-size: 22px;">Kp=</th>
+                    <th> <input type="text" style="width: 60px;" id="kpin" name="fname"></th>
+                    <th style="font-size: 22px;">Ki=</th>
+                    <th> <input type="text" id="kiin" style="width: 60px;" name="fname2"></th>
+                    <th style="font-size: 22px;">Kd=</th>
+                    <th> <input type="text" id="kdin" style="width: 60px;" name="fname3"></th>
+                </tr>
+            </table>
+            <button onclick="savePID()" type="button" class="buttonStyle3">Save PID Settings</button>
+            <button onclick="startCamUpdate()" type="button" class="buttonStyle3">Update Camera Firmware</button>
+        </div>
+    </div>
+
+
+
+    <div id="snackbar">Some text some message..</div>
     <footer class="container footer">
         <div class="col-md-12 text-center">
 
@@ -323,6 +434,9 @@ const char MAIN_PAGE[] = R"=====(
     </footer>
 
     <script>
+        const d = new Date();
+        let ms = d.getMilliseconds();
+        var toastMessage;
         function emgStop() {
             // wait for answer callback
             var xhttp = new XMLHttpRequest();
@@ -428,7 +542,7 @@ const char MAIN_PAGE[] = R"=====(
                 if (this.readyState == 4 && this.status == 200) {
                     document.getElementById("camStatus").innerHTML =
                         this.responseText;
-                    console.log(this.responseText);
+                    // console.log(this.responseText);
                 }
             };
             xhttp.open("GET", "notifyCAM", true);
@@ -453,10 +567,19 @@ const char MAIN_PAGE[] = R"=====(
                         myArray[5];
                     document.getElementById("kdin").placeholder =
                         myArray[6];
+                    document.getElementById("heaterStatus").placeholder =
+                        myArray[7];
+                    document.getElementById("humidifierStatus").placeholder =
+                        myArray[8];
+                       let period =parseInt(myArray[9])-ms;
+                    document.getElementById("lagText").innerHTML =
+                     "Data Period:"+  period;
+ ms=parseInt(myArray[9]);
                     console.log(this.responseText);
                 }
             };
             xhttp.open("GET", "liveData", true);
+              console.log( xhttp.status);
             xhttp.send();
 
             var xhttp2 = new XMLHttpRequest();
@@ -469,6 +592,26 @@ const char MAIN_PAGE[] = R"=====(
             };
             xhttp2.open("GET", "readPrcButton", true);
             xhttp2.send();
+
+            var xhttp3 = new XMLHttpRequest();
+            xhttp3.onreadystatechange = function () {
+                if (this.readyState == 4 && this.status == 200) {
+                    document.getElementById("snackbar").innerHTML =
+                        this.responseText;
+
+                    var x = document.getElementById("snackbar");
+
+                    console.log("toast:" + this.responseText);
+                    // Add the "show" class to DIV
+                    x.className = "show";
+                    if (this.responseText != "")
+                        // After 3 seconds, remove the show class from DIV
+                        setTimeout(function () { x.className = x.className.replace("show", ""); }, 3000);
+                }
+
+            };
+            xhttp3.open("GET", "readToast", true);
+            xhttp3.send();
         }
         function getMessage() {
 
@@ -477,7 +620,7 @@ const char MAIN_PAGE[] = R"=====(
                 if (this.readyState == 4 && this.status == 200) {
                     document.getElementById("msg").innerHTML =
                         this.responseText;
-                    console.log(this.responseText);
+                    //  console.log(this.responseText);
                 }
             };
             xhttp.open("GET", "message", true);
@@ -528,7 +671,8 @@ const char MAIN_PAGE[] = R"=====(
         integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa"
         crossorigin="anonymous"></script>
 </body>
-</html>
+
+</html>,
 )=====";
 const char PAGE_404[] = R"====(
 <html>
@@ -541,19 +685,6 @@ const char PAGE_404[] = R"====(
     </body>
 </html>
 )====";
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const char SETTINGS_PAGE[] = R"=====(
 <!doctype html>
@@ -734,6 +865,3 @@ button {
 
 </html>
 )=====";
-
-
-

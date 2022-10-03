@@ -9,9 +9,13 @@
 #include <Adafruit_SSD1306.h>
 #include "myfonts.h"
 #include "html.h"
-#include "EEPROM.h"
+#include "functionLib.h"
 #include <AutoPID.h>
 #include <Fonts/FreeSans9pt7b.h>
+#include <PID_v1.h>
+#include <PID_AutoTune_v0.h>
+
+functionLib functions;
 
 #define humidifierPin 26
 #define heaterFan 25
@@ -25,14 +29,13 @@
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
 #define OLED_RESET -1 // Reset pin # (or -1 if sharing Arduino reset pin)
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-
 union twoByte
 {
     byte bVal[2];
     int iVal;
 };
 
-#define CHANNEL 1
+#define CHANNEL 0
 
 #define cmdTemp 0x01
 #define cmdHum 0x02
@@ -41,10 +44,7 @@ union twoByte
 #define cmdFlashToggle 0x5
 #define cmdCamTempError 0x6
 #define cmdCamUpdateMode 0x7
-double temp, hum, targetTemp, targetHum, tempOutputVal, humOutputVal, KP = 0.0, KI = 0.0, KD = 0.0;
-
-String esid;
-String epass = "";
+double temp, hum, targetTemp, targetHum, tempOutputVal, humOutputVal;
 
 const char *ssidAP = "CCKIT";
 const char *passwordAP = "12345678";
@@ -54,16 +54,16 @@ IPAddress gateway(192, 168, 1, 254);
 IPAddress subnet(255, 255, 255, 0);
 IPAddress dns(192, 168, 1, 254);
 
-byte sensorError = 0;
-byte camStatus;
+byte sensorError = 1;
+byte camStatus = 0;
 byte processStatus = 0;
-byte peerConnected = 0;
 byte camWifiSettingResponse = 0;
 uint8_t broadcastAddress[] = {0xE0, 0xE2, 0xE6, 0xCF, 0x9D, 0xAC};
 uint8_t mode = 0;
-long lastHeaterOpen;
-
-String message = "Waiting for process";
+byte heaterStatus = 0;
+byte humidifierStatus = 0;
+long lastHeaterOpen = 0;
+long camLastReceive = 0;
 
 String ssidRecv;
 String passRecv;
@@ -73,9 +73,10 @@ esp_now_peer_info_t slave;
 
 typedef struct broadcast_message
 {
+    char device[16] = "unkown";
     char type[16] = "unknown"; // data or broadcast
     char ssid[16] = "slave";   // slave or master
-    char pass[16] = "unknown"; // slider pan tilt
+    char pass[16] = "unknown";
     uint8_t datalen = 1;
     char data[128] = " ";
 } broadcast_message;
@@ -92,8 +93,6 @@ void sendDebugMessages(int tick);
 void initBroadcastSlave();
 void configCamWifi(const char *ssid, const char *pass);
 void startPage();
-void saveToEEPROM(String qsid, String qpass);
-void loadFromEEPROM();
 void getWifiConfFromHTTP(void *parameter);
 void initDisplay();
 void composeDisplay();
@@ -104,8 +103,7 @@ void humidityTask(void *parameter);
 void heaterTask(void *parameter);
 void stateHeater(byte state);
 void stateHeaterFan(byte state);
-void savePIDEEPROM(double p, double i, double d);
-void loadPIDFromEEPROM();
+void updateProcessStatus(byte status, byte error = 0);
 ////////////////HANDLES///////////////
 
 void handleLED(AsyncWebServerRequest *request)
@@ -118,26 +116,27 @@ void handleLED(AsyncWebServerRequest *request)
 
     request->send(200, "text/plane", "1"); // Send web page
 }
-void handleRGB(AsyncWebServerRequest *request)
+void handleProcess(AsyncWebServerRequest *request)
 {
     // get RGB values from parameters
-    String rVal = request->arg("r");
-    String gVal = request->arg("g");
-
-    Serial.print(rVal);
+    String rcvTargetTemp = request->arg("r");
+    String rcvTargetHum = request->arg("g");
+    Serial.print("Target temp:");
+    Serial.print(rcvTargetTemp);
+    Serial.print("Target hum:");
     Serial.print("\t");
-    Serial.println(gVal);
+    Serial.println(rcvTargetHum);
     if (processStatus)
     {
-        processStatus = 0;
+        updateProcessStatus(0, 1);
     }
     else
     {
-        processStatus = 1;
+
+        processAction(rcvTargetTemp.toInt(), rcvTargetHum.toInt());
     }
     // send answer to client
     request->send(200, "text/plane", "1");
-    processAction(rVal.toInt(), gVal.toInt());
 }
 void handleWifiSettings(AsyncWebServerRequest *request)
 {
@@ -176,11 +175,23 @@ void handleLiveData(AsyncWebServerRequest *request)
     liveData.concat("|");
     liveData.concat(String(targetHum));
     liveData.concat("|");
-    liveData.concat(String(KP));
+    liveData.concat(String(functions.KP));
     liveData.concat("|");
-    liveData.concat(String(KI));
+    liveData.concat(String(functions.KI));
     liveData.concat("|");
-    liveData.concat(String(KD));
+    liveData.concat(String(functions.KD));
+    liveData.concat("|");
+    if (heaterStatus)
+        liveData.concat(String("ON"));
+    else
+        liveData.concat(String("OFF"));
+    liveData.concat("|");
+    if (humidifierStatus)
+        liveData.concat(String("ON"));
+    else
+        liveData.concat(String("OFF"));
+    liveData.concat("|");
+    liveData.concat((String)millis());
     request->send(200, "text/plane", String(liveData));
 }
 void handlePrcStatus(AsyncWebServerRequest *request)
@@ -188,39 +199,36 @@ void handlePrcStatus(AsyncWebServerRequest *request)
     String processBtn;
     if (processStatus)
     {
-        message = "Processing...";
         processBtn = "Stop";
     }
     else
     {
-        if (millis() > 5000)
-            message = "Stopped.";
-
         processBtn = "Process";
     }
     request->send(200, "text/plane", processBtn);
 }
 void handleNotifyCam(AsyncWebServerRequest *request)
 {
-    String status;
-    if (peerConnected)
+    String status = "Camera Couldn't Found";
+    if (camStatus)
     {
-        status = "Camera ON";
+        status = "Camera Connected";
     }
     else
     {
-        status = "Camera OFF";
+        status = "Camera Couldn't Found";
     }
     request->send(200, "text/plane", status);
 }
 
 void handleMessage(AsyncWebServerRequest *request)
 {
-    request->send(200, "text/plane", message);
+    request->send(200, "text/plane", functions.message);
 }
 void handleRoot(AsyncWebServerRequest *request)
 {
-    Serial.println("Controller connected");
+    Serial.print(request->args());
+    Serial.println(" Controller connected");
     request->send(200, "text/html", MAIN_PAGE);
 }
 void handleRootWifi(AsyncWebServerRequest *request)
@@ -254,18 +262,17 @@ void handleEmergencyStop(AsyncWebServerRequest *request)
 
     // send answer to client
     request->send(200, "text/plane", "1");
-    processStatus = 0;
+    updateProcessStatus(0, 1);
     Serial.println("emergency Stop");
-    message = "Emergency Stop";
 }
 void handleCamUpdate(AsyncWebServerRequest *request)
 {
 
     // send answer to client
     request->send(200, "text/plane", "1");
-    processStatus = 0;
+    updateProcessStatus(0);
     Serial.println("Cam Update");
-    message = "Starting cam update mode";
+    functions.message = "Starting cam update mode";
     uint8_t senddata[] = {cmdCamUpdateMode};
     std::string dataval = std::string((char *)senddata, 1);
     sendData(dataval, 1);
@@ -281,21 +288,39 @@ void handleSavePID(AsyncWebServerRequest *request)
     Serial.print(ki);
     Serial.print("kd ");
     Serial.print(kd);
+    if (kp == 0.00f)
+    {
+        kp = functions.KP;
+    }
+    if (ki == 0.00f)
+    {
+        ki = functions.KI;
+    }
+    if (kd == 0.00f)
+    {
+        kd = functions.KD;
+    }
     request->send(200, "text/plane", "1");
     Serial.println(" Saving PID");
-    savePIDEEPROM(kp, ki, kd);
+    functions.savePIDEEPROM(kp, ki, kd);
 }
 
 void handleFlash(AsyncWebServerRequest *request)
 {
-
     String req = request->arg("w");
-
     Serial.println(req);
-
     // send answer to client
     request->send(200, "text/plane", "1");
     uint8_t senddata[] = {cmdFlashToggle};
     std::string dataval = std::string((char *)senddata, 1);
     sendData(dataval, 1);
+}
+void handleToast(AsyncWebServerRequest *request)
+{
+    // readToast
+    if (functions.toastMessage != "")
+    {
+        request->send(200, "text/plane", functions.toastMessage);
+    }
+    functions.toastMessage = "";
 }
